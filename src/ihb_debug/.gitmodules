@@ -1,0 +1,3 @@
+[submodule "lib/ihb_cpp"]
+	path = lib/ihb_cpp
+	url = git@github.com:DoubleArmery/ihb_cpp.git

@@ -1,0 +1,9 @@
+uint8  id
+uint8  cmd
+float32 target_angle
+uint16 target_velocity
+uint16 kp
+uint8  kd
+uint16 target_torque
+float32 angle
+uint16 speed_limit

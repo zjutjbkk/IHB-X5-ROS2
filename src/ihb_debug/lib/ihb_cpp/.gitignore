@@ -1,0 +1,7 @@
+build*
+.vscode
+.vscode/settings.json
+a.out
+config
+log
+cmake-3.31.0-rc1-linux-aarch64.sh

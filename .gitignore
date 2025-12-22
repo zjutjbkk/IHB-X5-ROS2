@@ -1,0 +1,137 @@
+# === IHB-X5 ROS2项目 .gitignore ===
+
+# ROS2编译输出目录
+build/
+install/
+log/
+reference/
+
+# 底层库编译输出
+src/ihb_debug/lib/ihb_cpp/build-*/
+src/ihb_debug/lib/ihb_cpp/demo/build-*/
+
+# Python缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# C++编译产物
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+*.out
+*.app
+*.dSYM/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+
+# IDE和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.temp
+*.log
+*.bak
+*.backup
+
+# 系统文件
+.directory
+*.pid
+*.seed
+*.pid.lock
+
+# 交换文件（如果有的话）
+/swapfile
+/tmp/temp_swapfile
+
+# 测试和调试文件
+core
+*.core
+gdb.txt
+valgrind.log
+
+# 文档生成
+doc/html/
+doc/latex/
+*.pdf
+
+# 配置文件（如果包含敏感信息）
+# config/secrets.yaml
+# config/local_config.yaml
+
+# 用户特定的脚本（可选）
+# my_*.sh
+# test_*.sh
+
+# ROS包特定忽略
+msg_gen/
+srv_gen/
+msg/*Action.msg
+msg/*ActionFeedback.msg
+msg/*ActionGoal.msg
+msg/*ActionResult.msg
+msg/*Feedback.msg
+msg/*Goal.msg
+msg/*Result.msg
+msg/_*.py
+build_isolated/
+devel_isolated/
+
+# Catkin（如果混用ROS1）
+devel/
+
+# 编译器和工具链
+.ccache/
+*.gcno
+*.gcda
+*.gcov
+
+# 性能分析
+*.prof
+perf.data*
+callgrind.out.*
+
+# 备份文件
+*~
+*.orig
+*.rej
+
+# 临时编辑文件
+.#*
+\#*#
+
+# 本地环境配置
+.env
+.env.local
+.env.*.local
+
+# 依赖管理
+node_modules/
+package-lock.json
+yarn.lock
+
+# 其他常见忽略
+*.tar.gz
+*.zip
+*.rar
+*.7z

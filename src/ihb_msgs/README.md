@@ -1,0 +1,31 @@
+WARN: 消息内变量不能用大写字母
+- Ihb_msg
+	- ServoMotorJoint
+		- Target
+			- id (uint8_t)
+			- angle (int64_t) 多圈角度
+			- speed_limit (int16_t)
+		- Status
+			- id (uint8_t)
+			- angle (int64_t) 多圈角度
+			- current (int16_t)
+			- temp (uint8_t)
+			- speed (int16_t)
+	- StepperMotorJoint
+		- Target
+			- id (uint8_t)
+			- height (int16_t)
+		- Status
+			- id (uint8_t)
+			- height (int16_t)
+	- MuscleJoint
+		- Target
+			- id (uint8_t)
+			- pressure (uint16_t)
+			- angle (int 16_t)
+			- stiffness (uint8_t)
+		- Status
+			- id (uint8_t)
+			- pressure (uint16_t)
+			- angle (int 16_t)
+			- stiffness (uint16_t)
