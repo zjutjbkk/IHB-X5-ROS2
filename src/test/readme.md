@@ -1,3 +1,4 @@
+ g++ main.cpp hall_sensors.cpp -o hall_test -std=c++17 -pthread
 g++ -std=c++17 main.cpp hall_sensors.cpp -o hall_test -lgpiodcxx -lgpiod -lpthread
 
  hb_gpioinfo
