@@ -17,7 +17,7 @@ set(msg_files
     "msg/ServoMotorJointTarget.msg" "msg/ServoMotorJointStatus.msg"
     "msg/StepperMotorJointTarget.msg" "msg/StepperMotorJointStatus.msg"
     "msg/MuscleJointTarget.msg" "msg/MuscleJointStatus.msg"
-    "msg/ForceSensorStatus.msg"
+    "msg/ForceSensorStatus.msg" 
     "msg/IhbStatus.msg" "msg/SingleArmStatus.msg"
     "msg/ArmTarget.msg"
     )
