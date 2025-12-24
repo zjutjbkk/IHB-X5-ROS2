@@ -77,8 +77,8 @@ private:
       float angle2 = hall_angles[7-i];   // 第二个角度
 
       // 设置角度值（转为int16）
-      message.muscle_joint[i].angle[0] = static_cast<float>(angle1);
-      message.muscle_joint[i].angle[1] = static_cast<float>(angle2);
+      message.muscle_joint[4-i].angle[0] = static_cast<float>(angle1);
+      message.muscle_joint[4-i].angle[1] = static_cast<float>(angle2);
       // RCLCPP_DEBUG(this->get_logger(), "肌肉%d: 角度1=%d, 角度2=%d", i+1, message.muscle_joint[i].angle[0], message.muscle_joint[i].angle[1]);
     }
     
