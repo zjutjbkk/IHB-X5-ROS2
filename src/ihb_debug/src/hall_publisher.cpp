@@ -74,12 +74,13 @@ private:
 
       // 优化：从批量读取的数据中获取角度值
       float angle1 = hall_angles[i];     // 第一个角度
-      float angle2 = hall_angles[i+4];   // 第二个角度
+      float angle2 = hall_angles[8+i];   // 第二个角度
 
       // 设置角度值（转为int16）
-      message.muscle_joint[i].angle[0] = static_cast<int16_t>(angle1);
-      // message.muscle_joint[i].angle[1] = static_cast<int16_t>(angle2);
+      message.muscle_joint[3-i].angle[0] = static_cast<int16_t>(angle1);
+      message.muscle_joint[3-i].angle[1] = static_cast<int16_t>(angle2);
       // RCLCPP_DEBUG(this->get_logger(), "肌肉%d: 角度1=%d, 角度2=%d", i+1, message.muscle_joint[i].angle[0], message.muscle_joint[i].angle[1]);
+      RCLCPP_INFO(this->get_logger(), "肌肉%d: 角度1=%f, 角度2=%f", i+1, message.muscle_joint[i].angle[0], message.muscle_joint[i].angle[1]);
 
     }
     
