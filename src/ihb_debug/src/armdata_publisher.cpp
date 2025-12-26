@@ -80,7 +80,7 @@ public:
 
     // 3. 停止硬件
     hall_sensors_.stop();
-    // ser1_.close(); // 根据需要决定退出时是否关闭电机
+    //  ser1_.close(); // 根据需要决定退出时是否关闭电机
     
     RCLCPP_INFO(this->get_logger(), "ArmStatusNode 已关闭");
   }
@@ -118,8 +118,17 @@ private:
 
                   // 分发数据给对应的电机对象处理
                   // processCanMessage 内部有互斥锁，是线程安全的
-                  if(canId == 0x141) ser1_.processCanMessage(data);
-                  else if (canId == 0x142) ser2_.processCanMessage(data);
+                  if(canId == 0x141) 
+                   {
+
+                    ser1_.processCanMessage(data);
+                  // RCLCPP_INFO(this->get_logger(), "Servo1 data received");
+                  }
+                  else if (canId == 0x142) 
+                  {
+                    ser2_.processCanMessage(data);
+                  // RCLCPP_INFO(this->get_logger(), "Servo2 data received");
+                   }
               }
               else
               {
@@ -180,8 +189,9 @@ private:
     publisher_->publish(message);
     
     // 降低日志频率 (INFO级别)
-    RCLCPP_INFO(this->get_logger(), "Data published: Servo1 Angle: %ld, Servo2 Angle: %ld", ser1_.MAngle(), ser2_.MAngle());
-  }
+    //RCLCPP_INFO(this->get_logger(), "Data published: Servo1 Angle: %.ld, Servo2 Angle: %.ld", ser1_.MAngle(), ser2_.MAngle());
+  RCLCPP_INFO(this->get_logger(), "Data published: Servo1 Angle: %.2f, Servo2 Angle: %.2f", ser1_.MAngle(), ser2_.MAngle());}
+
 
   void start_motors() {
       ser1_.start(); ser2_.start();

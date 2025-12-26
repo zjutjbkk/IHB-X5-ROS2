@@ -55,7 +55,7 @@ ament_target_dependencies(hall_publisher rclcpp std_msgs ihb_msgs)
 # ament_target_dependencies(data_upload rclcpp std_msgs ihb_msgs)
 ament_target_dependencies(hall_test rclcpp std_msgs ihb_msgs)
 # ament_target_dependencies(hall_test_simple rclcpp std_msgs ihb_msgs)
-ament_target_dependencies(armdata_publisher rclcpp std_msgs ihb_msgs)
+ament_target_dependencies(armdata_publisher  rclcpp std_msgs ihb_msgs)
 
 install(TARGETS
   # ihb_debug_node

@@ -30,6 +30,10 @@ namespace ihb
 
         // 带有速度限制的位置闭环
         void setPositonWithSpeedLimit(int position, int speedLimit);
+        void setCanDriver(std::shared_ptr<sockcanpp::CanDriver> driver) {
+        std::lock_guard<std::mutex> lock(_data_mutex);
+                canDriver = driver;
+                       }
         // 速度闭环
         // void setSpeed(int speed);
         // 转矩闭环
@@ -44,14 +48,14 @@ namespace ihb
         void start();
         // 处理CAN报文
         // 保护 内部状态不会被外部修改
-        int64_t MAngle()
+        double MAngle()
         {
             
             std::lock_guard<std::mutex> lock(_data_mutex);
             // return std::round((m_angle / Ratio/100.0 )* 10) / 10;//保留一位小数  
             // std::round：对移动后的值进行四舍五入到最接近的整数 (round(18.3) -> 18.0)。这个配合double作为返回值可以实现一位小数精确变换
             double precise_angle = static_cast<double>(m_angle) / 100.0 / static_cast<double>(Ratio);
-            return std::llround(precise_angle);
+            return std::round(precise_angle*10.0)/10.0;
         }
         int16_t Angle()
         {
