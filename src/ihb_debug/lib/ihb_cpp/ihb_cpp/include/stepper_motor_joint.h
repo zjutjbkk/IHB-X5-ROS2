@@ -56,7 +56,7 @@ namespace ihb
         static constexpr int DIR_GPIO_LINE = 2; // Pin 381
         static constexpr int PWM_CHIP_NUM = 0;
         static constexpr int PWM_CHANNEL = 0;
-        static constexpr float STEPS_PER_MM = 1000.0f;
+        static constexpr float STEPS_PER_MM = 2000.0f;
 
         // --- 状态与资源管理 ---
         std::atomic<int16_t> height_;

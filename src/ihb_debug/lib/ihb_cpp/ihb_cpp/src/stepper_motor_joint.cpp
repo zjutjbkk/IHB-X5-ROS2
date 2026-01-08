@@ -34,12 +34,12 @@ namespace ihb
             {
                 std::cout << "步进电机析构中，正在归零..." << std::endl;
                 int32_t steps_to_zero = std::abs(heightToSteps(current_height));
-                uint16_t homing_speed = 1000;
+                uint16_t homing_speed = 10000;
                 bool dir_to_zero = (current_height > 0) ? false : true;
 
                 {
                     std::lock_guard<std::mutex> hw_lock(hardware_mutex_);
-                    dir_pin_line_.set_value(dir_to_zero ? 1 : 0);
+                    dir_pin_line_.set_value(dir_to_zero ? 0 : 1);
 
                     if (homing_speed > 0 && steps_to_zero > 0)
                     {
@@ -123,7 +123,7 @@ namespace ihb
         {
             {
                 std::lock_guard<std::mutex> hw_lock(hardware_mutex_);
-                dir_pin_line_.set_value(move_direction ? 1 : 0);
+                dir_pin_line_.set_value(move_direction ? 0 : 1);
 
                 // 确保PWM被禁用
                 pwm_enable(false);
