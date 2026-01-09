@@ -14,7 +14,7 @@ namespace ihb
     public:
         StepperMotorJoint();
         ~StepperMotorJoint();
-
+        
         // 禁止拷贝和赋值
         StepperMotorJoint(const StepperMotorJoint&) = delete;
         StepperMotorJoint& operator=(const StepperMotorJoint&) = delete;
@@ -28,7 +28,7 @@ namespace ihb
         void setSpeed(uint16_t pulses_per_second);
         void stopMotor();
         void resetZero();
-
+        void homeToZeroBlocking(uint16_t speed = 10000);
         bool isMoving() const;
         bool setBrake(bool brake);
 
