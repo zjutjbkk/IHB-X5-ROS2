@@ -39,13 +39,6 @@ add_executable(hall_publisher src/hall_publisher.cpp)
 # add_executable(data_upload src/data_upload.cpp)
 add_executable(hall_test src/hall_test.cpp)
 # add_executable(hall_test_simple src/hall_test_simple.cpp)
-add_executable(step_motor_publisher
-  src/step_motor_publisher.cpp
-)
-add_executable(step_motor_subscriber
-  src/step_motor_sub.cpp
-)
-
 add_executable(ihb_armstatus_publisher src/ihb_armstatus_publisher.cpp)
 
 # target_link_libraries(ihb_debug_node ihb_cpp)
@@ -54,14 +47,6 @@ target_link_libraries(hall_publisher ihb_cpp)
 # target_link_libraries(data_upload ihb_cpp)
 target_link_libraries(hall_test ihb_cpp)
 # target_link_libraries(hall_test_simple ihb_cpp)
-target_link_libraries(step_motor_subscriber
-  ihb_cpp
-)
-target_link_libraries(step_motor_publisher
-
-  ihb_cpp
-)
-
 target_link_libraries(ihb_armstatus_publisher ihb_cpp)
 
 # ament_target_dependencies(ihb_debug_node rclcpp  ihb_msgs)
@@ -71,8 +56,6 @@ ament_target_dependencies(hall_publisher rclcpp std_msgs ihb_msgs)
 ament_target_dependencies(hall_test rclcpp std_msgs ihb_msgs)
 # ament_target_dependencies(hall_test_simple rclcpp std_msgs ihb_msgs)
 ament_target_dependencies(ihb_armstatus_publisher  rclcpp std_msgs ihb_msgs)
-ament_target_dependencies(step_motor_publisher rclcpp std_msgs ihb_msgs)
-ament_target_dependencies(step_motor_subscriber rclcpp  std_msgs ihb_msgs)
 
 install(TARGETS
   # ihb_debug_node
@@ -82,8 +65,6 @@ install(TARGETS
   hall_test
   # hall_test_simple
   ihb_armstatus_publisher
-  step_motor_publisher
-  step_motor_subscriber
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -14,7 +14,7 @@ namespace ihb
     public:
         StepperMotorJoint();
         ~StepperMotorJoint();
-        
+
         // 禁止拷贝和赋值
         StepperMotorJoint(const StepperMotorJoint&) = delete;
         StepperMotorJoint& operator=(const StepperMotorJoint&) = delete;
@@ -28,7 +28,7 @@ namespace ihb
         void setSpeed(uint16_t pulses_per_second);
         void stopMotor();
         void resetZero();
-        void homeToZeroBlocking(uint16_t speed = 10000);
+
         bool isMoving() const;
         bool setBrake(bool brake);
 
@@ -56,7 +56,7 @@ namespace ihb
         static constexpr int DIR_GPIO_LINE = 2; // Pin 381
         static constexpr int PWM_CHIP_NUM = 0;
         static constexpr int PWM_CHANNEL = 0;
-        static constexpr float STEPS_PER_MM = 2000.0f;
+        static constexpr float STEPS_PER_MM = 1000.0f;
 
         // --- 状态与资源管理 ---
         std::atomic<int16_t> height_;

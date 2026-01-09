@@ -81,7 +81,7 @@ int main() {
 
     // 移动到-10mm高度，速度为1000脉冲/秒
     printf("📍 移动到高度 -10 mm (速度: 1000 脉冲/秒)...\n");
-    g_motor->moveToHeight(-25, 10000);
+    g_motor->moveToHeight(-10, 1000);
 
     // 等待运动完成
     printf("⏳ 等待运动完成...\n");
@@ -99,7 +99,7 @@ int main() {
     
     // 相对移动，上升5mm
     printf("相对移动 -5 mm...\n");
-    g_motor->moveRelative(-5, 10000);
+    g_motor->moveRelative(-5, 2000);
     
     // 等待一段时间
     printf("等待3秒...\n");
@@ -114,7 +114,7 @@ int main() {
     
     // 相对移动，下降10mm
     printf("相对移动 10 mm...\n");
-    g_motor->moveRelative(10, 10000);
+    g_motor->moveRelative(10, 1500);
     
     // 等待一段时间
     printf("等待3秒...\n");
