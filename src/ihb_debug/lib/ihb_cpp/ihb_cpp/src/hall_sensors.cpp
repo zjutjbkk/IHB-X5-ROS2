@@ -129,6 +129,11 @@ void HallSensors::start(uint32_t print_interval_ms) {
                           << std::fixed << std::setprecision(2) << std::setw(8) << angles[i] << " | ";
                 if (i == 7) {
                     std::cout << "\n"; // 8个一行
+
+                }
+                if (i == 15) {
+                    std::cout << "\n"; // 8个一行
+                    
                 }
             }
             std::cout << std::flush;
