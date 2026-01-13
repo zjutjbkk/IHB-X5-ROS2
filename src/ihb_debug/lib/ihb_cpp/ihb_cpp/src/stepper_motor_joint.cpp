@@ -34,12 +34,12 @@ namespace ihb
             {
                 std::cout << "步进电机析构中，正在归零..." << std::endl;
                 int32_t steps_to_zero = std::abs(heightToSteps(current_height));
-                uint16_t homing_speed = 1000;
+                uint16_t homing_speed = 10000;
                 bool dir_to_zero = (current_height > 0) ? false : true;
 
                 {
                     std::lock_guard<std::mutex> hw_lock(hardware_mutex_);
-                    dir_pin_line_.set_value(dir_to_zero ? 1 : 0);
+                    dir_pin_line_.set_value(dir_to_zero ? 0 : 1);
 
                     if (homing_speed > 0 && steps_to_zero > 0)
                     {
@@ -90,7 +90,43 @@ namespace ihb
         pwm_unexport();
         std::cout << "硬件资源已清理。" << std::endl;
     }
+    void ihb::StepperMotorJoint::homeToZeroBlocking(uint16_t homing_speed)
+    {
+        stopMotor();
 
+        int16_t current_height = height_.load();
+        if (current_height == 0) {
+            return;
+        }
+
+        std::cout << "归零中..." << std::endl;
+        int32_t steps_to_zero = std::abs(heightToSteps(current_height));
+        bool dir_to_zero = (current_height > 0) ? false : true;
+
+        {
+            std::lock_guard<std::mutex> hw_lock(hardware_mutex_);
+            dir_pin_line_.set_value(dir_to_zero ? 0 : 1);
+
+            if (homing_speed > 0 && steps_to_zero > 0) {
+                int period_ns = 1000000000 / homing_speed;
+                pwm_set_period(period_ns);
+                pwm_set_duty_cycle(period_ns / 2);
+                pwm_enable(true);
+
+                int run_time_ms = (steps_to_zero * 1000) / homing_speed;
+                std::this_thread::sleep_for(std::chrono::milliseconds(run_time_ms + 50));
+
+                pwm_enable(false);
+            }
+        }
+
+        height_.store(0);          // ✅ 关键：回零完成后更新高度
+        moving_.store(false);
+        thread_running_.store(false);
+
+        std::cout << "归零完成。" << std::endl;
+    }    
+    
     // === 核心运动逻辑 ===
     void StepperMotorJoint::moveToHeight(int16_t targetHeight, uint16_t speed)
     {
@@ -123,7 +159,7 @@ namespace ihb
         {
             {
                 std::lock_guard<std::mutex> hw_lock(hardware_mutex_);
-                dir_pin_line_.set_value(move_direction ? 1 : 0);
+                dir_pin_line_.set_value(move_direction ? 0 : 1);
 
                 // 确保PWM被禁用
                 pwm_enable(false);
