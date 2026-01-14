@@ -6,8 +6,14 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
-#include <sys/inotify.h> // 新增：用于监控文件系统
-#include <unistd.h>      // 新增
+
+// --- 修复点 1: 增加必要的系统头文件以支持 setsockopt 和 CAN 宏 ---
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <sys/inotify.h>
+#include <unistd.h>
+#include <linux/can.h>
+#include <linux/can/raw.h>
 
 #include <rcl_interfaces/msg/set_parameters_result.hpp>
 #include "ihb_msgs/msg/single_arm_status.hpp"
@@ -25,14 +31,13 @@ class IhbSlaveArmController : public rclcpp::Node
 public:
     IhbSlaveArmController()
     : Node("ihb_slave_arm_controller"), 
+      // --- 修复点 2: 严格按照类私有变量声明的顺序初始化，解决 -Wreorder 警告 ---
+      yaml_path_("/root/jbkk/IHB-X5-ROS2/src/ihb_debug/config/pid_params.yaml"),
       g_running_(true),
-      ser1_(1), ser2_(2),
-      // --- 【重要】在这里填写你的 YAML 文件绝对路径 ---
-      yaml_path_("/root/jbkk/IHB-X5-ROS2/src/ihb_debug/config/pid_params.yaml")
+      ser1_(1), ser2_(2)
     {
-        RCLCPP_INFO(this->get_logger(), ">>> 正在初始化 IHB [自动热加载 PID] 节点...");
+        RCLCPP_INFO(this->get_logger(), ">>> 正在初始化 IHB [热加载 PID 控制] 节点...");
 
-        // 1. 声明参数
         for (int i = 0; i < 4; i++) {
             std::string prefix = "joint" + std::to_string(i) + ".";
             this->declare_parameter(prefix + "p", 30.0);
@@ -52,11 +57,8 @@ public:
             subscriber_ = this->create_subscription<ihb_msgs::msg::ArmTarget>(
                 "arm_target", 10, std::bind(&IhbSlaveArmController::target_callback, this, std::placeholders::_1));
 
-            // 启动线程
             receive_thread_ = std::thread(&IhbSlaveArmController::receive_can_frames, this);
             pid_thread_ = std::thread(&IhbSlaveArmController::pid_control_loop, this);
-            
-            // --- 新增：启动 YAML 文件监控线程 ---
             watch_thread_ = std::thread(&IhbSlaveArmController::watch_yaml_file, this);
 
             query_timer_ = this->create_wall_timer(50ms, std::bind(&IhbSlaveArmController::poll_motor_callback, this));
@@ -79,15 +81,13 @@ public:
     }
 
 private:
-    // --- 新增：核心监控逻辑 ---
     void watch_yaml_file() {
         int fd = inotify_init();
         if (fd < 0) return;
-
-        // 监控文件的“关闭并写入”事件
         int wd = inotify_add_watch(fd, yaml_path_.c_str(), IN_CLOSE_WRITE);
         if (wd < 0) {
-            RCLCPP_ERROR(this->get_logger(), "无法监控 YAML 文件，请检查路径是否正确: %s", yaml_path_.c_str());
+            RCLCPP_ERROR(this->get_logger(), "无法监控 YAML 文件: %s", yaml_path_.c_str());
+            close(fd);
             return;
         }
 
@@ -99,22 +99,21 @@ private:
             struct timeval tv;
             tv.tv_sec = 1; tv.tv_usec = 0;
 
-            // 使用 select 避免死锁，允许优雅退出
             int retval = select(fd + 1, &descriptors, NULL, NULL, &tv);
             if (retval > 0 && FD_ISSET(fd, &descriptors)) {
                 int length = read(fd, buffer, 1024);
                 if (length > 0) {
-                    RCLCPP_INFO(this->get_logger(), "📂 检测到 YAML 文件保存，正在自动加载新参数...");
-                    // 执行系统命令加载参数，这会触发 on_params_changed_callback
+                    RCLCPP_INFO(this->get_logger(), "📂 检测到 YAML 保存，自动加载参数...");
                     std::string cmd = "ros2 param load /ihb_slave_arm_controller " + yaml_path_ + " &";
-                    system(cmd.c_str());
+                    int res = system(cmd.c_str());
+                    (void)res;
                 }
             }
         }
+        inotify_rm_watch(fd, wd);
         close(fd);
     }
 
-    // 参数更新回调
     rcl_interfaces::msg::SetParametersResult on_params_changed_callback(const std::vector<rclcpp::Parameter> &parameters)
     {
         rcl_interfaces::msg::SetParametersResult result;
@@ -133,6 +132,7 @@ private:
                         double i = (name == prefix + ".i") ? param.as_double() : this->get_parameter(prefix + ".i").as_double();
                         double d = (name == prefix + ".d") ? param.as_double() : this->get_parameter(prefix + ".d").as_double();
                         muscle_joints_[idx].setPidParameters(p, i, d);
+                        RCLCPP_INFO(this->get_logger(), "♻️ 关节 %d PID 更新: P=%.2f, I=%.2f, D=%.2f", idx, p, i, d);
                     }
                 } catch (...) {}
             }
@@ -140,16 +140,23 @@ private:
         return result;
     }
 
-    // --- 硬件初始化逻辑 ---
+    void init_can_bus() {
+        int res = system("sudo ip link set can1 down");
+        res = system("sudo ip link set can1 type can bitrate 1000000");
+        res = system("sudo ip link set can1 up");
+        (void)res;
+        std::this_thread::sleep_for(500ms);
+    }
+
     void setup_hardware() {
         for(int idx=0; idx<4; idx++) {
             std::string prefix = "joint" + std::to_string(idx) + ".";
-            double p = this->get_parameter(prefix + "p").as_double();
-            double i = this->get_parameter(prefix + "i").as_double();
-            double d = this->get_parameter(prefix + "d").as_double();
             muscle_joints_[idx].setId(idx);
             muscle_joints_[idx].setCanDriver(shared_can_driver_);
-            muscle_joints_[idx].setPidParameters(p, i, d); 
+            muscle_joints_[idx].setPidParameters(
+                this->get_parameter(prefix+"p").as_double(),
+                this->get_parameter(prefix+"i").as_double(),
+                this->get_parameter(prefix+"d").as_double());
         }
         ser1_.setCanDriver(shared_can_driver_);
         ser2_.setCanDriver(shared_can_driver_);
@@ -157,17 +164,10 @@ private:
         hall_sensors_.start(0);
     }
 
-    // ... (receive_can_frames, pid_control_loop, target_callback, poll_motor_callback 保持不变) ...
-
-    void init_can_bus() {
-        system("sudo ip link set can1 down");
-        system("sudo ip link set can1 type can bitrate 1000000");
-        system("sudo ip link set can1 up");
-        std::this_thread::sleep_for(500ms);
-    }
-
     void receive_can_frames() {
-        int lb = 0; setsockopt(shared_can_driver_->getSocketFd(), SOL_CAN_RAW, CAN_RAW_LOOPBACK, &lb, sizeof(lb));
+        int lb = 0; 
+        // --- 修复点 3: 这里现在有了头文件，宏定义可以正常识别 ---
+        setsockopt(shared_can_driver_->getSocketFd(), SOL_CAN_RAW, CAN_RAW_LOOPBACK, &lb, sizeof(lb));
         uint8_t data[8];
         while (g_running_ && rclcpp::ok()) {
             if (shared_can_driver_->waitForMessages(2ms)) {
@@ -235,22 +235,9 @@ private:
         msg.servo_motor[1].id = 2;
         msg.servo_motor[1].angle = -ser2_.MAngle();
         publisher_->publish(msg);
-
-        static int print_count = 0;
-        if (print_count++ % 10 == 0) {
-            printf("\033[2J\033[H");
-            RCLCPP_INFO(this->get_logger(), "==================== [ 热加载 PID 监控 ] ====================");
-            for(int i=0; i<4; i++) {
-                std::string pre = "joint" + std::to_string(i);
-                RCLCPP_INFO(this->get_logger(), "关节 %d: P=%.1f, I=%.2f, D=%.1f", 
-                    i, this->get_parameter(pre+".p").as_double(),
-                    this->get_parameter(pre+".i").as_double(),
-                    this->get_parameter(pre+".d").as_double());
-            }
-            RCLCPP_INFO(this->get_logger(), "==============================================================");
-        }
     }
 
+    // --- 修复点 2 相关: 类成员变量的声明顺序 ---
     std::string yaml_path_;
     std::atomic<bool> g_running_;
     std::thread receive_thread_, pid_thread_, watch_thread_;
