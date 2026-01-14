@@ -182,7 +182,7 @@ private:
     }
 
     void publish_status_callback() {
-        auto msg = ihb_msgs::msg::SingleArmStatus();
+        auto msg = ihb_msgs::msg::SingleArmS;'tatus();
         msg.header.stamp = this->now();
         msg.header.frame_id = "slave_link";
         std::vector<float> halls = hall_sensors_.getAllAngles();
