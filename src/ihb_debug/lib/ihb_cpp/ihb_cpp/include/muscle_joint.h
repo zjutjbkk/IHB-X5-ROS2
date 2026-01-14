@@ -12,6 +12,10 @@ namespace ihb
     public:
         MuscleJoint(uint16_t id = 0, double kp = 0, double ki = 0, double kd = 0);
         ~MuscleJoint();
+        void setCanDriver(std::shared_ptr<sockcanpp::CanDriver> driver) {
+         std::lock_guard<std::mutex> lock(_data_mutex);
+         this->canDriver = driver;
+        }
 
         void setId(uint16_t id)
         {
@@ -53,6 +57,7 @@ namespace ihb
 
         void setPressure(uint16_t pressure_1, uint16_t pressure_2, uint16_t pressure_3, uint16_t pressure_4);
         void setDoublePressure(double pressure_1, double pressure_2);
+  
 
         // 新增：设置目标角度
         void setTargetAngle(double target1, double target2);

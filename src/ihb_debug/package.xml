@@ -8,6 +8,7 @@
   <license>Apache License 2.0</license>
   <buildtool_depend>ament_cmake</buildtool_depend>
   <depend>ihb_msgs</depend>
+  <depend>std_msgs</depend>
   <depend>rclcpp</depend>
 
   <test_depend>ament_lint_auto</test_depend>

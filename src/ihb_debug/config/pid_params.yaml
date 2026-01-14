@@ -1,0 +1,7 @@
+ihb_slave_arm_status_publisher.cpp:
+  ros__parameters:
+    # 气动肌肉关节的 PID 参数
+    muscle_pid:
+      p: 30.0
+      i: 1.8
+      d: 120.0
