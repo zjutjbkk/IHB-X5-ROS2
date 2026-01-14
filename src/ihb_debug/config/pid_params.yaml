@@ -1,7 +1,19 @@
-ihb_slave_arm_status_publisher.cpp:
+ihb_slave_arm_controller:
   ros__parameters:
-    # 气动肌肉关节的 PID 参数
-    muscle_pid:
+    # 为 4 个气动肌肉关节分别设置独立的 PID
+    joint0:
+      p: 30.0
+      i: 1.8
+      d: 120.0
+    joint1:
+      p: 30.0
+      i: 1.8
+      d: 120.0
+    joint2:
+      p: 30.0
+      i: 1.8
+      d: 120.0
+    joint3:
       p: 30.0
       i: 1.8
       d: 120.0
