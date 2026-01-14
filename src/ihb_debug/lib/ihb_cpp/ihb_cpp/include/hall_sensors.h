@@ -6,64 +6,53 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
-#include <gpiod.hpp> // 使用 libgpiod C++ 绑定
-// 将类放入 ihb 命名空间
+#include <deque>     // 新增：用于中值滤波的滑动窗口
+#include <gpiod.hpp> 
+
 namespace ihb
 {
     class HallSensors
     {
     public:
-        // 构造函数：初始化SPI和GPIO
         HallSensors();
-        // 析构函数：释放资源
         ~HallSensors();
 
-        // 禁止拷贝和赋值，因为包含独占的硬件资源
         HallSensors(const HallSensors &) = delete;
         HallSensors &operator=(const HallSensors &) = delete;
 
         /**
          * @brief 启动后台线程。
-         * @param print_interval_ms 自动打印角度数据的时间间隔（单位：毫秒）。
-         *                          如果为 0，则不启动自动打印功能。
          */
-        void start(uint32_t print_interval_ms = 0); // 修改 start 函数签名，并提供默认值
+        void start(uint32_t print_interval_ms = 0);
 
-        // 停止后台读取线程
         void stop();
 
-        // 获取单个传感器的值（原始值，减去零点后）
-        // 线程安全
+        // 获取原始值
         int16_t getValue(uint8_t sensor_index);
-
-        // 获取单个传感器的角度值（浮点数）
-        // 线程安全
         float getAngle(uint8_t sensor_index);
-
-        // 获取所有16个传感器的角度值
-        // 线程安全，返回一个值的副本，避免数据竞争
         std::vector<float> getAllAngles();
 
-        // 设置当前位置为零点
-        // 线程安全
+        /**
+         * @brief 获取混合滤波后的角度值 (中值滤波 + 一阶低通)
+         * @param alpha 一阶低通系数 (0.0-1.0)，越小越平滑，延迟越大
+         * @param window_size 中值滤波窗口大小，必须为奇数
+         */
+        std::vector<float> getFilteredAngles(float alpha = 0.2f, size_t window_size = 5);
+
         void setZero();
 
     private:
-        // --- 新增: 打印线程相关 ---
-        void printLoop();                            // 打印线程的循环函数
-        std::thread print_thread_;                   // 打印线程对象
-        std::atomic<uint32_t> print_interval_ms_{0}; // 打印间隔
-        // 后台读取循环
+        void printLoop();                            
+        std::thread print_thread_;                   
+        std::atomic<uint32_t> print_interval_ms_{0}; 
         void readLoop();
 
         // SPI和GPIO硬件资源
         int spi1_fd_ = -1;
         int spi2_fd_ = -1;
-
-        // libgpiod 资源
         gpiod::chip gpio_chip_;
-        gpiod::line cs1_line_; // CS for SPI1
-        gpiod::line cs2_line_; // CS for SPI2
+        gpiod::line cs1_line_; 
+        gpiod::line cs2_line_; 
 
         // 线程管理
         std::thread read_thread_;
@@ -74,19 +63,20 @@ namespace ihb
         std::vector<uint16_t> raw_values_;
         std::vector<uint16_t> zero_offsets_;
 
+        // --- 新增：滤波状态存储 ---
+        std::vector<float> last_lpf_values_;          // 存储上一时刻的一阶低通值
+        std::vector<std::deque<float>> median_queues_; // 存储每个传感器的中值窗口
+        bool filters_initialized_ = false;
+
         // 常量定义
         static constexpr const char *SPI1_DEVICE = "/dev/spidev1.0";
         static constexpr const char *SPI2_DEVICE = "/dev/spidev2.0";
-        static constexpr uint32_t SPI_SPEED_HZ = 1000000; // 提高速率以获得更好性能
+        static constexpr uint32_t SPI_SPEED_HZ = 1000000; 
         static constexpr uint8_t SPI_BITS_PER_WORD = 16;
-        static constexpr uint8_t SPI_MODE = 1; // SPI_MODE_1
+        static constexpr uint8_t SPI_MODE = 1; 
 
-        // 根据 gpioinfo 的输出进行精确定义
-        // gpiochip4 controls pins 379-410
         static constexpr const char *GPIO_CHIP_NAME = "gpiochip4";
-        // Pin 394 (CS for SPI1) on gpiochip4 is at offset (394-379) = 15
         static constexpr int CS1_PIN_OFFSET = 15;
-        // Pin 400 (CS for SPI2) on gpiochip4 is at offset (400-379) = 21
         static constexpr int CS2_PIN_OFFSET = 21;
 
         static constexpr int SENSOR_COUNT = 16;
