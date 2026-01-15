@@ -275,9 +275,9 @@ namespace ihb
         _target_angle1 = target1;
         _target_angle2 = target2;
 
-        // 重置 PID 控制器，清除积分项
-        _pid1.reset();
-        _pid2.reset();
+        // // 重置 PID 控制器，清除积分项
+        // _pid1.reset();
+        // _pid2.reset();
     }
 
     double MuscleJoint::getTargetAngle1() const

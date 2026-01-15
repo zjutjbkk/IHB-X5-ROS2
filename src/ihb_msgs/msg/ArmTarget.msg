@@ -1,16 +1,17 @@
-# 机械臂目标控制消息 (分层组合设计)
-# 通过话题命名空间区分左右臂: /left_arm/target 和 /right_arm/target
+# [建议] 添加标准消息头，用于追踪时间戳和坐标系
+std_msgs/Header header
 
-# 控制模式
+# --- 控制模式常量定义 ---
+uint8 CMD_OFF = 0          # 关闭 PID / 释放电机
+uint8 CMD_STATICS = 1      # 静力学模型控制
+uint8 CMD_PID_CONTROL = 2  # PID 闭环控制
+
+# 控制模式字段
 uint8 cmd
-# cmd 取值说明:
-# 0 = 关闭PID
-# 1 = 静力学模型
-# 2 = PID控制 (需要发送所有肌肉关节的 kp, ki, kd 参数)
 
-# 2个舵机关节 (保持原有字段定义和ID编号)
+# --- 关节定义 ---
+# 2个舵机关节: 数组大小固定为 2
 ServoMotorJointTarget[2] servo_joints
 
-# 4个肌肉关节 (保持原有字段定义和ID编号)
+# 4个肌肉关节: 数组大小固定为 4
 MuscleJointTarget[4] muscle_joints
-
