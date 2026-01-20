@@ -336,8 +336,8 @@ namespace ihb
         _pid2.setI(ki);
         _pid2.setD(kd);
 
-        // 重置 PID 控制器状态
-        _pid1.reset();
-        _pid2.reset();
+        // // 重置 PID 控制器状态
+        // _pid1.reset();
+        // _pid2.reset();
     }
 }

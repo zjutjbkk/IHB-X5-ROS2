@@ -47,6 +47,10 @@ public:
             query_timer_ = this->create_wall_timer(30ms, std::bind(&IhbSlaveArmController::poll_motor_callback, this));
             publish_timer_ = this->create_wall_timer(50ms, std::bind(&IhbSlaveArmController::publish_status_callback, this));
 
+            ser1_.setPositonWithSpeedLimit(0.0, 360.0);   
+            ser2_.setPositonWithSpeedLimit(0.0, 360.0);
+
+
         } catch (const std::exception& e) {
             RCLCPP_FATAL(this->get_logger(), "❌ 初始化失败: %s", e.what());
         }
@@ -74,7 +78,7 @@ private:
         log_file_.open(ss.str(), std::ios::out);
         if (log_file_.is_open()) {
             // 设置全局不使用科学计数法
-            log_file_ << std::fixed << std::setprecision(0);
+            log_file_ << std::fixed << std::setprecision(2);
             log_file_ << "Timestamp_ms,Target_A1,Target_A2,Target_A3,Target_A4,Target_A5,Target_A6,Target_A7,Target_A8,"
                       << "Actual_A1,Actual_A2,Actual_A3,Actual_A4,Actual_A5,Actual_A6,Actual_A7,Actual_A8,"
                       << "Motor1,Motor2" << std::endl;
@@ -89,7 +93,7 @@ private:
         for (int i = 0; i < 4; i++) {
             msg.muscle_joint[i].id = i + 1;
             if (halls.size() >= 8) {
-                msg.muscle_joint[i].angle[0] = static_cast<int16_t>(halls[i]);
+                msg.muscle_joint[i].angle[0] = -static_cast<int16_t>(halls[i]);
                 msg.muscle_joint[i].angle[1] = static_cast<int16_t>(halls[7-i]);
             }
         }
@@ -98,14 +102,24 @@ private:
         publisher_->publish(msg);
 
         // --- 核心修改：写入 CSV ---
-        if (log_file_.is_open()) {
-            std::lock_guard<std::mutex> lock(mtx_);
-            
-            // 计算毫秒级时间戳 (不要科学计数法)
-            uint64_t timestamp_ms = (static_cast<uint64_t>(msg.header.stamp.sec) * 1000ULL) + 
-                                    (static_cast<uint64_t>(msg.header.stamp.nanosec) / 1000000ULL);
+if (log_file_.is_open()) {
+    std::lock_guard<std::mutex> lock(mtx_);
 
-            log_file_ << timestamp_ms;
+    // 1. 计算当前总毫秒数 (绝对时间戳)
+    uint64_t current_ms = (static_cast<uint64_t>(msg.header.stamp.sec) * 1000ULL) + 
+                          (static_cast<uint64_t>(msg.header.stamp.nanosec) / 1000000ULL);
+
+    // 2. 如果是第一次运行，记录初始时间
+    if (start_time_ms_ == 0) {
+        start_time_ms_ = current_ms;
+    }
+
+    // 3. 计算相对时间戳（从0开始递增，非常短）
+    uint64_t relative_ms = current_ms - start_time_ms_;
+
+    // 4. 写入文件 (假设你使用的是 fprintf 或 log_file_ <<)
+    // 此时只打印 relative_ms，去掉了之前的 time_str
+    log_file_ << relative_ms << "";
 
             // 记录目标值
             for(int i=0; i<4; i++) {
@@ -116,10 +130,10 @@ private:
             // 记录实际值
             if (halls.size() >= 8) {
                 for(int i=0; i<4; i++) {
-                    log_file_ << "," << halls[i] << "," << halls[7-i];
+                    log_file_ << "," << -halls[i] << "," << halls[7-i];
                 }
             } else {
-                for(int i=0; i<8; i++) log_file_ << ",0";
+                for(int i=0; i<8; i++) log_file_ << ",0.00";
             }
             
             // 记录电机及换行，并强制刷新缓冲确保数据不丢失（适合农用复杂环境）
@@ -149,7 +163,7 @@ private:
             if (halls.size() >= 8) {
                 std::lock_guard<std::mutex> lock(mtx_); 
                 for (int i = 0; i < 4; i++) {
-                    muscle_joints_[i].processAngle(halls[i], halls[7-i]);
+                    muscle_joints_[i].processAngle(-halls[i], halls[7-i]);
                     muscle_joints_[i].update(); 
                 }
             }
@@ -194,7 +208,8 @@ private:
         for(int i=0; i<4; i++) {
             muscle_joints_[i].setId(i);
             muscle_joints_[i].setCanDriver(shared_can_driver_);
-            muscle_joints_[i].setPidParameters(30.0, 1.5, 100.0);
+            // muscle_joints_[i].setPidParameters(30.0, 1.5, 100.0);
+            muscle_joints_[i].setPidParameters(0.0, 0.0, 0.0);
         }
         ser1_.setCanDriver(shared_can_driver_);
         ser2_.setCanDriver(shared_can_driver_);
@@ -207,6 +222,7 @@ private:
     std::mutex mtx_;
     std::shared_ptr<sockcanpp::CanDriver> shared_can_driver_;
     std::ofstream log_file_; 
+    uint64_t start_time_ms_ = 0;
     
     ihb::HallSensors hall_sensors_;
     ihb::MuscleJoint muscle_joints_[4];
