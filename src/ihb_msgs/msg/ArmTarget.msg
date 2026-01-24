@@ -10,8 +10,8 @@ uint8 CMD_PID_CONTROL = 2  # PID 闭环控制
 uint32 cmd
 
 # --- 关节定义 ---
-# 4个舵机关节: 数组大小固定为 4
-ServoMotorJointTarget[4] servo_joints
+# 2个舵机关节: 数组大小固定为 2
+ServoMotorJointTarget[2] servo_joints
 
-# 8个肌肉关节: 数组大小固定为 8
-MuscleJointTarget[8] muscle_joints
+# 4个肌肉关节: 数组大小固定为 4
+MuscleJointTarget[4] muscle_joints
