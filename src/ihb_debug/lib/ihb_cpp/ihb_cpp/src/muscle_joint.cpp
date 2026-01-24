@@ -4,7 +4,6 @@
 #include <iostream>
 #include <algorithm> // for std::min
 
-
 namespace ihb
 {
 
@@ -97,7 +96,8 @@ namespace ihb
         int iteration = 0;
         while (fabs(target_angle1 - current_angle1) > 0.1 || fabs(target_angle2 - current_angle2) > 0.1)
         {
-            if (iteration > 1000) break;
+            if (iteration > 1000)
+                break;
 
             // 优化：减少锁的持有时间，批量获取数据
             {
@@ -116,7 +116,8 @@ namespace ihb
             std::this_thread::sleep_for(std::chrono::milliseconds(30));
 
             // 减少日志输出频率，避免影响性能
-            if (iteration % 10 == 0) {
+            if (iteration % 10 == 0)
+            {
                 std::cout << "ID" << id() << "\t迭代:" << iteration << std::endl;
             }
         }
@@ -124,13 +125,15 @@ namespace ihb
     void MuscleJoint::setDoublePressure(double pressure_1, double pressure_2)
     {
         std::lock_guard<std::mutex> lock(_data_mutex);
-        
+
         // 判断正负号并转换为整数后充气
         if (pressure_1 >= 0)
         {
             _pressure[1] = (uint16_t)pressure_1;
             _pressure[3] = 0;
-        }else{
+        }
+        else
+        {
             _pressure[1] = 0;
             _pressure[3] = (uint16_t)fabs(pressure_1);
         }
@@ -138,14 +141,15 @@ namespace ihb
         {
             _pressure[2] = (uint16_t)pressure_2;
             _pressure[0] = 0;
-        }else{
+        }
+        else
+        {
             _pressure[2] = 0;
             _pressure[0] = (uint16_t)fabs(pressure_2);
         }
         // 直接调用内部实现，避免死锁（已经持有锁）
         setPressureInternal(_pressure[0], _pressure[1], _pressure[2], _pressure[3]);
         // std::cout << "setPressure: " << _pressure[0] << ", " << _pressure[1] << ", " << _pressure[2] << ", " << _pressure[3] << std::endl;
-
     }
 
     void MuscleJoint::setZero()
@@ -224,6 +228,8 @@ namespace ihb
         {
             _angle[0] = data[1] << 8 | data[2];
             _angle[1] = data[3] << 8 | data[4];
+            // _f_angle[0] = _angle[0];
+            // _f_angle[1] = _angle[1];
         }
     }
     void MuscleJoint::processAngle(float a1, float a2)
@@ -237,7 +243,7 @@ namespace ihb
 
     {
         std::lock_guard<std::mutex> lock(_data_mutex);
-       
+
         setPressureInternal(pressure_1, pressure_2, pressure_3, pressure_4);
     }
 
@@ -249,11 +255,11 @@ namespace ihb
         int canID = 0x110 + _id;
         unsigned char data[8];
         memset(data, 0, sizeof(data));
-            // 定义气压上限，使用常量可以方便未来修改
+        // 定义气压上限，使用常量可以方便未来修改
         const uint16_t MAX_PRESSURE_LIMIT = 280;
 
-    // 使用 std::min 函数对每个气压值进行钳位操作
-    // std::min(a, b) 会返回 a 和 b 中较小的值
+        // 使用 std::min 函数对每个气压值进行钳位操作
+        // std::min(a, b) 会返回 a 和 b 中较小的值
         uint16_t p1_clamped = std::min(pressure_1, MAX_PRESSURE_LIMIT);
         uint16_t p2_clamped = std::min(pressure_2, MAX_PRESSURE_LIMIT);
         uint16_t p3_clamped = std::min(pressure_3, MAX_PRESSURE_LIMIT);
@@ -324,20 +330,21 @@ namespace ihb
         setDoublePressure(output1, output2);
     }
 
-    void MuscleJoint::setPidParameters(double kp, double ki, double kd)
+    void MuscleJoint::setPidParameters(double kp1, double ki1, double kd1, double kp2, double ki2, double kd2)
     {
         std::lock_guard<std::mutex> lock(_data_mutex);
 
         // 重新配置 PID 控制器
-        _pid1.setP(kp);
-        _pid1.setI(ki);
-        _pid1.setD(kd);
-        _pid2.setP(kp);
-        _pid2.setI(ki);
-        _pid2.setD(kd);
+        _pid1.setP(kp1);
+        _pid1.setI(ki1);
+        _pid1.setD(kd1);
+        _pid2.setP(kp2);
+        _pid2.setI(ki2);
+        _pid2.setD(kd2);
 
         // // 重置 PID 控制器状态
         // _pid1.reset();
         // _pid2.reset();
     }
+
 }

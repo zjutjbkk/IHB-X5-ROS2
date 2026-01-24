@@ -82,7 +82,8 @@ private:
         for(int i=0; i<4; i++) {
             muscle_joints_[i].setId(i);
             muscle_joints_[i].setCanDriver(shared_can_driver_);
-            muscle_joints_[i].setPidParameters(30.0, 1.8, 120.0); 
+            // muscle_joints_[i].setPidParameters(30.0, 1.8, 120.0); 
+            muscle_joints_[i].setPidParameters(0.0, 0.0, 0.0,0.0, 0.0, 0.0);
         }
         ser1_.setCanDriver(shared_can_driver_);
         ser2_.setCanDriver(shared_can_driver_);

@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-     #include <mutex>
+#include <mutex>
 #include "CanDriver.hpp"
 #include "MiniPID.h"
 #include <memory>
@@ -12,9 +12,10 @@ namespace ihb
     public:
         MuscleJoint(uint16_t id = 0, double kp = 0, double ki = 0, double kd = 0);
         ~MuscleJoint();
-        void setCanDriver(std::shared_ptr<sockcanpp::CanDriver> driver) {
-         std::lock_guard<std::mutex> lock(_data_mutex);
-         this->canDriver = driver;
+        void setCanDriver(std::shared_ptr<sockcanpp::CanDriver> driver)
+        {
+            std::lock_guard<std::mutex> lock(_data_mutex);
+            this->canDriver = driver;
         }
 
         void setId(uint16_t id)
@@ -44,8 +45,8 @@ namespace ihb
         void getStiffness(uint8_t &stiffness1);
 
         // 设置角度
-        void setAngle(int16_t angle1, int16_t angle2);  
-        void setAnglePID(float angle1, float angle2,float kp, float ki, float kd); // PID控制
+        void setAngle(int16_t angle1, int16_t angle2);
+        void setAnglePID(float angle1, float angle2, float kp, float ki, float kd); // PID控制
         // 设置零点
         void setZero();
         // 设置变刚度
@@ -53,11 +54,10 @@ namespace ihb
         void setStiffness(int16_t stiffness1);                     // 目前开环控制，后续可能会改为闭环控制
 
         void processCanMessage(uint8_t *data);
-        void processAngle(float a1,float a2);
+        void processAngle(float a1, float a2);
 
         void setPressure(uint16_t pressure_1, uint16_t pressure_2, uint16_t pressure_3, uint16_t pressure_4);
         void setDoublePressure(double pressure_1, double pressure_2);
-  
 
         // 新增：设置目标角度
         void setTargetAngle(double target1, double target2);
@@ -70,7 +70,8 @@ namespace ihb
         void update();
 
         // 新增：设置 PID 参数
-        void setPidParameters(double kp, double ki, double kd);
+        // 在类定义中修改声明
+        void setPidParameters(double kp1, double ki1, double kd1, double kp2, double ki2, double kd2);
 
     private:
         uint8_t _id;
@@ -90,7 +91,7 @@ namespace ihb
         double _target_angle1;
         double _target_angle2;
 
-        void calcVirAngle(float alpha , float beta, float &G, float &H);
+        void calcVirAngle(float alpha, float beta, float &G, float &H);
 
         // 内部方法（假设调用者已持有锁）
         void setPressureInternal(uint16_t pressure_1, uint16_t pressure_2, uint16_t pressure_3, uint16_t pressure_4);

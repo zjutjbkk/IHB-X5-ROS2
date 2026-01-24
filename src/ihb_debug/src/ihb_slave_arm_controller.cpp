@@ -152,7 +152,8 @@ if (log_file_.is_open()) {
         for (size_t i = 0; i < msg->muscle_joints.size() && i < 4; i++) {
             muscle_joints_[i].setTargetAngle(msg->muscle_joints[i].angle[0], msg->muscle_joints[i].angle[1]);
             if (msg->cmd == 2) {
-                muscle_joints_[i].setPidParameters(msg->muscle_joints[i].kp, msg->muscle_joints[i].ki, msg->muscle_joints[i].kd);
+                muscle_joints_[i].setPidParameters(msg->muscle_joints[i].kp[0], msg->muscle_joints[i].ki[0], msg->muscle_joints[i].kd[0],
+                                                   msg->muscle_joints[i].kp[1], msg->muscle_joints[i].ki[1], msg->muscle_joints[i].kd[1]);
             }
         }
     }
@@ -209,7 +210,7 @@ if (log_file_.is_open()) {
             muscle_joints_[i].setId(i);
             muscle_joints_[i].setCanDriver(shared_can_driver_);
             // muscle_joints_[i].setPidParameters(30.0, 1.5, 100.0);
-            muscle_joints_[i].setPidParameters(0.0, 0.0, 0.0);
+            muscle_joints_[i].setPidParameters(0.0, 0.0, 0.0,0.0,0.0,0.0); // 初始 PID 全部为 0
         }
         ser1_.setCanDriver(shared_can_driver_);
         ser2_.setCanDriver(shared_can_driver_);
