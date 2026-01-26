@@ -54,7 +54,7 @@ private:
         // 获取主臂的所有角度传感器数据
         std::vector<float> hall_angles = hall_sensors_.getAllAngles();
 
-        if (hall_angles.size() >= 8)
+        if (hall_angles.size() >= 16)
         {
             // ================= 1. 电机目标映射 (主臂传感器 -> 从臂电机) =================
             // 这里的逻辑是：主臂的 4 个传感器读数，直接传给从臂的 4 个电机目标
@@ -70,11 +70,11 @@ private:
 
             // 【左臂电机】: 主端 Hall 4, 5 -> 从端 ID 1, 2
             target_msg.servo_joints[2].id = 3;
-            target_msg.servo_joints[2].angle = hall_angles[6];
+            target_msg.servo_joints[2].angle = hall_angles[10];
             target_msg.servo_joints[2].speed_limit = 120.0;
 
             target_msg.servo_joints[3].id = 4;
-            target_msg.servo_joints[3].angle = hall_angles[7];
+            target_msg.servo_joints[3].angle = hall_angles[11];
             target_msg.servo_joints[3].speed_limit = 120.0;
 
             // ================= 2. 肌肉关节 1对4 映射逻辑 =================
@@ -83,11 +83,11 @@ private:
             static const float kd_table[4][2] = {{1.5, 1.0}, {0.0, 0.0}, {0.5, 1.0}, {0.1, 0.1}};
 
             // 获取左右主臂基准关节数据
-            float R_master_a0 = hall_angles[0];
-            float R_master_a1 = hall_angles[1];
-            // 左臂关节 (6, 7)
-            float L_master_a0 = hall_angles[4];
-            float L_master_a1 = hall_angles[5];
+            float R_master_a0 = hall_angles[0]/3;
+            float R_master_a1 = hall_angles[1]/3;
+            // 左臂关节 (8, 9)
+            float L_master_a0 = hall_angles[8]/3;
+            float L_master_a1 = hall_angles[9]/3;
 
             for (int i = 0; i < 8; i++)
             {
@@ -122,14 +122,14 @@ private:
            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
                                  "\n[New Mapping Applied]\n"
                                  "--- Right Arm (Slave ID 3,4 | MJ 1-4) ---\n"
-                                 "Motor Target (Hall 0,1): [%.2f, %.2f]\n"
-                                 "Muscle Target (Hall 2,3): [%.2f, %.2f]\n"
+                                 "Motor Target (Hall 2,3): [%.2f, %.2f]\n"
+                                 "Muscle Target (Hall 0,1): [%.2f, %.2f]\n"
                                  "--- Left Arm (Slave ID 1,2 | MJ 5-8) ---\n"
-                                 "Motor Target (Hall 4,5): [%.2f, %.2f]\n"
-                                 "Muscle Target (Hall 6,7): [%.2f, %.2f]\n"
+                                 "Motor Target (Hall 10,11): [%.2f, %.2f]\n"
+                                 "Muscle Target (Hall 8,9): [%.2f, %.2f]\n"
                                  "-------------------------------------------",
                                  hall_angles[2], hall_angles[3], R_master_a0, R_master_a1,
-                                 hall_angles[6], hall_angles[7], L_master_a0, L_master_a1);
+                                 hall_angles[10], hall_angles[11], L_master_a0, L_master_a1);
         }
     }
 
