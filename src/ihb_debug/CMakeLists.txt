@@ -42,6 +42,7 @@ add_executable(ihb_slave_arm_status_publisher src/ihb_slave_arm_status_publisher
 # add_executable(hall_test_simple src/hall_test_simple.cpp)
 add_executable(ihb_armstatus_publisher src/ihb_armstatus_publisher.cpp)
 add_executable(ihb_slave_arm_controller src/ihb_slave_arm_controller.cpp)
+add_executable(ihb_master_arm_publisher src/ihb_master_arm_publisher.cpp) 
 
 # target_link_libraries(ihb_debug_node ihb_cpp)
 # target_link_libraries(ihb_debug_test ihb_cpp)
@@ -52,6 +53,7 @@ target_link_libraries(hall_test ihb_cpp)
 # target_link_libraries(hall_test_simple ihb_cpp)
 target_link_libraries(ihb_armstatus_publisher ihb_cpp)
 target_link_libraries(ihb_slave_arm_controller ihb_cpp)
+target_link_libraries(ihb_master_arm_publisher ihb_cpp)
 
 # ament_target_dependencies(ihb_debug_node rclcpp  ihb_msgs)
 # ament_target_dependencies(ihb_debug_test rclcpp  ihb_msgs)
@@ -62,6 +64,7 @@ ament_target_dependencies(hall_test rclcpp std_msgs ihb_msgs)
 # ament_target_dependencies(hall_test_simple rclcpp std_msgs ihb_msgs)
 ament_target_dependencies(ihb_armstatus_publisher  rclcpp std_msgs ihb_msgs)
 ament_target_dependencies(ihb_slave_arm_controller  rclcpp std_msgs ihb_msgs)
+ament_target_dependencies(ihb_master_arm_publisher  rclcpp std_msgs ihb_msgs)
 
 install(TARGETS
   # ihb_debug_node
@@ -73,6 +76,7 @@ install(TARGETS
   ihb_armstatus_publisher
   ihb_slave_arm_status_publisher
   ihb_slave_arm_controller
+  ihb_master_arm_publisher
   DESTINATION lib/${PROJECT_NAME}
 )
 
