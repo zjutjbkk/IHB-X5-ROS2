@@ -12,8 +12,8 @@
 #include <linux/can.h>
 #include <linux/can/raw.h>
 
-#include "ihb_msgs/msg/single_arm_status.hpp"
-#include "ihb_msgs/msg/arm_target.hpp"
+#include "ihb_msgs/msg/ihb_arm_status.hpp"
+#include "ihb_msgs/msg/ihb_target.hpp"
 #include "hall_sensors.h"
 #include "servo_motorJoint.h"
 #include "muscle_joint.h"
@@ -39,13 +39,13 @@ public:
                 "arm_target", 10, std::bind(&IhbSlaveArmController::target_callback, this, std::placeholders::_1));
             
             // 发布从臂状态 (建议根据需要检查消息定义是否支持 8 肌肉关节数据)
-            publisher_ = this->create_publisher<ihb_msgs::msg::SingleArmStatus>("slave_arm_status", 10);
+            publisher_ = this->create_publisher<ihb_msgs::msg::IhbArmStatus>("slave_arm_status", 10);
 
             receive_thread_ = std::thread(&IhbSlaveArmController::receive_can_frames, this);
             pid_thread_ = std::thread(&IhbSlaveArmController::pid_control_loop, this);
 
-            query_timer_ = this->create_wall_timer(30ms, std::bind(&IhbSlaveArmController::poll_motor_callback, this));
-            publish_timer_ = this->create_wall_timer(50ms, std::bind(&IhbSlaveArmController::publish_status_callback, this));
+            query_timer_ = this->create_wall_timer(40ms, std::bind(&IhbSlaveArmController::poll_motor_callback, this));
+            publish_timer_ = this->create_wall_timer(60ms, std::bind(&IhbSlaveArmController::publish_status_callback, this));
 
             // 电机初始位置归零
             ser1_.setPositonWithSpeedLimit(0.0, 100.0);
@@ -134,7 +134,7 @@ private:
 }
 
 void publish_status_callback() {
-    auto msg = ihb_msgs::msg::SingleArmStatus();
+    auto msg = ihb_msgs::msg::IhbArmStatus();
     msg.header.stamp = this->now();
     std::vector<float> halls = hall_sensors_.getAllAngles();
 
@@ -242,7 +242,7 @@ void publish_status_callback() {
     ihb::MuscleJoint muscle_joints_[8];
     ihb::ServoMotorJoint ser1_{1}, ser2_{2}, ser3_{3}, ser4_{4};
 
-    rclcpp::Publisher<ihb_msgs::msg::SingleArmStatus>::SharedPtr publisher_;
+    rclcpp::Publisher<ihb_msgs::msg::IhbArmStatus>::SharedPtr publisher_;
     rclcpp::Subscription<ihb_msgs::msg::IhbTarget>::SharedPtr subscriber_;
     rclcpp::TimerBase::SharedPtr query_timer_, publish_timer_;
 };

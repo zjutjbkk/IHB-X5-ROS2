@@ -5,7 +5,7 @@
 #include <atomic>
 
 // 消息定义
-#include "ihb_msgs/msg/arm_target.hpp"
+#include "ihb_msgs/msg/ihb_target.hpp"
 
 // 底层库头文件 (仅保留传感器)
 #include "/root/jbkk/IHB-X5-ROS2/src/ihb_debug/lib/ihb_cpp/ihb_cpp/include/hall_sensors.h"
@@ -26,10 +26,10 @@ public:
             hall_sensors_.start(0);
 
             // 2. 发布的配置
-            target_publisher_ = this->create_publisher<ihb_msgs::msg::ArmTarget>("arm_target", 10);
+            target_publisher_ = this->create_publisher<ihb_msgs::msg::IhbTarget>("arm_target", 10);
 
             // 3. 定时同步回调 (33ms 约等于 30Hz)
-            sync_timer_ = this->create_wall_timer(100ms, std::bind(&IhbMasterController::sync_control_callback, this));
+            sync_timer_ = this->create_wall_timer(33ms, std::bind(&IhbMasterController::sync_control_callback, this));
 
             RCLCPP_INFO(this->get_logger(), "传感器系统就绪。");
         }
@@ -48,7 +48,7 @@ public:
 private:
     void sync_control_callback()
     {
-        auto target_msg = ihb_msgs::msg::ArmTarget();
+        auto target_msg = ihb_msgs::msg::IhbTarget();
         target_msg.cmd = 2; // PID 控制模式
 
         // 获取主臂的所有角度传感器数据
@@ -65,7 +65,7 @@ private:
             target_msg.servo_joints[0].speed_limit = 120.0;
 
             target_msg.servo_joints[1].id = 2;
-            target_msg.servo_joints[1].angle = hall_angles[2];
+            target_msg.servo_joints[1].angle = hall_angles[3];
             target_msg.servo_joints[1].speed_limit = 120.0;
 
             // 【左臂电机】: 主端 Hall 4, 5 -> 从端 ID 1, 2
@@ -134,7 +134,7 @@ private:
     }
 
     ihb::HallSensors hall_sensors_;
-    rclcpp::Publisher<ihb_msgs::msg::ArmTarget>::SharedPtr target_publisher_;
+    rclcpp::Publisher<ihb_msgs::msg::IhbTarget>::SharedPtr target_publisher_;
     rclcpp::TimerBase::SharedPtr sync_timer_;
 };
 

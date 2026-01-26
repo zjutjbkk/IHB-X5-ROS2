@@ -20,6 +20,7 @@ set(msg_files
     "msg/ForceSensorStatus.msg" 
     "msg/IhbStatus.msg" "msg/SingleArmStatus.msg"
     "msg/ArmTarget.msg" "msg/IhbTarget.msg"
+    "msg/IhbArmStatus.msg"
     )
 rosidl_generate_interfaces(${PROJECT_NAME} ${msg_files} DEPENDENCIES
                            builtin_interfaces std_msgs)
