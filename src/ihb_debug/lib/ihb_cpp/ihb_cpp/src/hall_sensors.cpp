@@ -90,7 +90,7 @@ void HallSensors::printLoop() {
         }
 
         // 修改点：打印循环可以改用滤波后的值，观察效果更明显
-        std::vector<float> angles = getFilteredAngles(0.2f, 5);
+        std::vector<float> angles = getAllAngles();
         
         std::cout << "\r"; 
         for (int i = 0; i < SENSOR_COUNT; ++i) {
@@ -162,7 +162,7 @@ float HallSensors::getAngle(uint8_t sensor_index) {
 std::vector<float> HallSensors::getAllAngles() {
     std::vector<float> angles(SENSOR_COUNT);
     for (int i = 0; i < SENSOR_COUNT; ++i) angles[i] = getAngle(i);
-    return angles;
+    return getFilteredAngles(0.2f, 5);//这样就直接用的滤波后的数据
 }
 
 // --- 新增：混合滤波实现 ---
