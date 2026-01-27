@@ -121,27 +121,55 @@ void HallSensors::readLoop() {
         .bits_per_word = SPI_BITS_PER_WORD,
     };
 
+    // 定义突变阈值：14位下 2度约为 91 个原始数值单位 (16384 / 360 * 2)
+    const int32_t JUMP_THRESHOLD = 100; 
+
     while (running_) {
-        // SPI1
+        // --- 处理 SPI1 (传感器 0-7) ---
         cs1_line_.set_value(0);
         ioctl(spi1_fd_, SPI_IOC_MESSAGE(1), &tr);
         cs1_line_.set_value(1);
         {
             std::lock_guard<std::mutex> lock(data_mutex_);
-            for (int i = 0; i < 8; ++i) raw_values_[i] = rx_buffer[i] & 0x3FFF;
+            for (int i = 0; i < 8; ++i) {
+                uint16_t current_raw = rx_buffer[i] & 0x3FFF;
+                
+                // 计算与上一帧的差值 (需考虑 14位 0-16383 的回绕情况)
+                int32_t diff = static_cast<int32_t>(current_raw) - static_cast<int32_t>(raw_values_[i]);
+                if (diff > 8192) diff -= 16384;
+                else if (diff < -8192) diff += 16384;
+
+                // 核心修正：如果变化太快（绝对值 > 阈值），判定为干扰，不更新 raw_values_
+                // 首次采样或 filters_initialized_ 为 false 时跳过校验
+                if (!filters_initialized_ || std::abs(diff) < JUMP_THRESHOLD) {
+                    raw_values_[i] = current_raw;
+                }
+            }
         }
 
         std::this_thread::sleep_for(std::chrono::microseconds(50));
 
-        // SPI2
+        // --- 处理 SPI2 (传感器 8-15) ---
         cs2_line_.set_value(0);
         ioctl(spi2_fd_, SPI_IOC_MESSAGE(1), &tr);
         cs2_line_.set_value(1);
         {
             std::lock_guard<std::mutex> lock(data_mutex_);
-            for (int i = 0; i < 8; ++i) raw_values_[i+8] = rx_buffer[i] & 0x3FFF;
+            for (int i = 0; i < 8; ++i) {
+                uint16_t current_raw = rx_buffer[i] & 0x3FFF;
+                int32_t diff = static_cast<int32_t>(current_raw) - static_cast<int32_t>(raw_values_[i+8]);
+                if (diff > 8192) diff -= 16384;
+                else if (diff < -8192) diff += 16384;
+
+                if (!filters_initialized_ || std::abs(diff) < JUMP_THRESHOLD) {
+                    raw_values_[i+8] = current_raw;
+                }
+            }
         }
         
+        // 标记至少已经成功采集过一次数据
+        // if (!filters_initialized_) filters_initialized_ = true;
+
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
 }
@@ -162,7 +190,7 @@ float HallSensors::getAngle(uint8_t sensor_index) {
 std::vector<float> HallSensors::getAllAngles() {
     std::vector<float> angles(SENSOR_COUNT);
     for (int i = 0; i < SENSOR_COUNT; ++i) angles[i] = getAngle(i);
-    return getFilteredAngles(0.2f, 5);//这样就直接用的滤波后的数据
+    return getFilteredAngles(0.1f, 5);//这样就直接用的滤波后的数据
 }
 
 // --- 新增：混合滤波实现 ---
