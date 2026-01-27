@@ -69,7 +69,7 @@ int main(int argc, char **argv)
         int loop_count = 0;
         while (g_running) {
             // 使用线程安全的接口读取所有传感器数据
-            std::vector<float> angles = hallSensors.getAllAngles();
+            std::vector<float> angles = hallSensors.getAllFilteredAngles();
 
             // 格式化输出
             std::cout << "Loop " << std::setw(3) << loop_count++ << ": ";

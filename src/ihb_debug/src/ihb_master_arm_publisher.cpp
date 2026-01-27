@@ -78,9 +78,12 @@ private:
             target_msg.servo_joints[3].speed_limit = 120.0;
 
             // ================= 2. 肌肉关节 1对4 映射逻辑 =================
-            static const float kp_table[4][2] = {{250.0, 180.0}, {180.0, 160.0}, {180.0, 240.0}, {240.0, 220.0}};
-            static const float ki_table[4][2] = {{0.8, 1.0}, {1.8, 1.5}, {1.0, 1.0}, {1.0, 1.2}};
-            static const float kd_table[4][2] = {{1.5, 1.0}, {0.0, 0.0}, {0.5, 1.0}, {0.1, 0.1}};
+            // static const float kp_table[4][2] = {{250.0, 180.0}, {180.0, 160.0}, {180.0, 240.0}, {240.0, 220.0}};
+            // static const float ki_table[4][2] = {{0.8, 1.0}, {1.8, 1.5}, {1.0, 1.0}, {1.0, 1.2}};
+            // static const float kd_table[4][2] = {{1.5, 1.0}, {0.0, 0.0}, {0.5, 1.0}, {0.1, 0.1}};
+            static const float kp_table[4][2] = {{50.0, 50.0}, {0.0 ,0.0}, {0.0 ,0.0}, {0.0 ,0.0}};
+            static const float ki_table[4][2] = {{0.8, 1.0}, {0.0 ,0.0}, {0.0 ,0.0}, {0.0 ,0.0}};
+            static const float kd_table[4][2] = {{1.5, 1.0}, {0.0, 0.0}, {0.0 ,0.0}, {0.0 ,0.0}};
 
             // 获取左右主臂基准关节数据
             float R_master_a0 = hall_angles[0]/3;
