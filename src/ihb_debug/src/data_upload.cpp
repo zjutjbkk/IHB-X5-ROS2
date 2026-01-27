@@ -460,7 +460,7 @@ private:
     // 可以添加更多步进电机的信息，如速度等
 
     // 优化：设置伺服电机状态，使用数组简化代码
-    std::array<std::unique_ptr<ihb::ServoMotorJoint>*, 4> servo_motors = {
+    std::array<std::unique_ptr<ihb::ServoMotorJoint>*, 4> servo_motor = {
       &ser1_, &ser2_, &ser3_, &ser4_
     };
 
@@ -469,10 +469,10 @@ private:
       message.servo_motor[i].id = i + 1;
 
       // 使用线程安全接口获取伺服电机数据
-      if (servo_motors[i] && *servo_motors[i]) {
-        message.servo_motor[i].angle = (*servo_motors[i])->MAngle();
-        message.servo_motor[i].current = (*servo_motors[i])->Current();
-        message.servo_motor[i].speed = (*servo_motors[i])->Speed();
+      if (servo_motor[i] && *servo_motor[i]) {
+        message.servo_motor[i].angle = (*servo_motor[i])->MAngle();
+        message.servo_motor[i].current = (*servo_motor[i])->Current();
+        message.servo_motor[i].speed = (*servo_motor[i])->Speed();
         message.servo_motor[i].temp = 0; // 默认温度为0
       } else {
         // 安全处理：如果电机对象无效，设置默认值

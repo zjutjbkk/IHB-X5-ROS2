@@ -12,13 +12,9 @@
 #include <linux/can.h>
 #include <linux/can/raw.h>
 
-// --- 引入自定义消息 ---
+// --- 引入消息定义 ---
 #include "ihb_msgs/msg/ihb_status.hpp"
 #include "ihb_msgs/msg/ihb_target.hpp"
-// 引入子消息类型 (通常包含在上述头文件中，但为了明确字段结构，需确认你的 msg生成情况)
-// 假设自动生成了如下结构:
-// ihb_msgs::msg::ServoMotorJointStatus
-// ihb_msgs::msg::MuscleJointStatus
 
 // --- 引入底层驱动库 ---
 #include "hall_sensors.h"
@@ -34,7 +30,7 @@ public:
     : Node("ihb_slave_dual_arm_controller"), g_running_(true), 
       ser1_(1), ser2_(2), ser3_(3), ser4_(4) 
     {
-        RCLCPP_INFO(this->get_logger(), ">>> IHB 双臂底层控制器启动 [适配新Msg定义] <<<");
+        RCLCPP_INFO(this->get_logger(), ">>> IHB 双臂底层控制器启动 [新消息格式适配版] <<<");
 
         try {
             // 1. 初始化日志
@@ -103,27 +99,19 @@ private:
         }
     }
 
-    // --- 状态发布回调 (IhbStatus) ---
+    // --- 状态发布回调 (适配新 IhbStatus.msg) ---
     void publish_status_callback() {
         auto msg = ihb_msgs::msg::IhbStatus();
         msg.header.stamp = this->now();
-        // frame_id 可根据需要填写
-        msg.header.frame_id = "base_link"; 
+        msg.header.frame_id = "ihb_slave"; 
 
-        // 1. 填充步进电机 (目前底层代码无步进电机驱动，填默认值)
-        // msg.stepper_motor.angle = 0.0;
-        // msg.stepper_motor.speed = 0.0;
-
-        // 2. 填充力传感器 (32个，默认0)
-        for(int i=0; i<32; i++) {
-            msg.force_sensor[i].id = i + 1;
-            msg.force_sensor[i].force = 0.0;
-        }
+        // 填充当前模式状态 (可选，这里默认填0或上一次接收到的命令)
+        // msg.cmd = current_cmd_; 
 
         std::vector<float> halls = hall_sensors_.getAllFilteredAngles();
 
-        // 3. 填充 8 个肌肉关节 (MuscleJointStatus[8])
-        // Msg定义中是固定数组，直接遍历下标 0-7
+        // 1. 填充 8 个肌肉关节 (字段名: muscle_joint, 大小: 8)
+        // 遍历 msg.muscle_joint 数组
         for (int i = 0; i < 8; i++) {
             msg.muscle_joint[i].id = i + 1;
             
@@ -144,13 +132,9 @@ private:
                 msg.muscle_joint[i].angle[0] = 0;
                 msg.muscle_joint[i].angle[1] = 0;
             }
-            
-            // 可以选择性回传当前气压值 (如果有读取功能)
-            // msg.muscle_joint[i].pressure[0] = ...
         }
 
-        // 4. 填充 4 个伺服电机 (ServoMotorJointStatus[4])
-        // 获取角度并填充
+        // 2. 填充 4 个伺服电机 (字段名: servo_joint, 大小: 4)
         float m_angles[4];
         m_angles[0] = -ser1_.MAngle();
         m_angles[1] = -ser2_.MAngle();
@@ -160,8 +144,7 @@ private:
         for(int i=0; i<4; i++) {
             msg.servo_motor[i].id = i + 1;
             msg.servo_motor[i].angle = m_angles[i];
-            // msg.servo_motor[i].speed = ...; // 如果有读速度
-            // msg.servo_motor[i].current = ...; // 如果有读电流
+            // 注意：如果 IhbStatus 用的是 Target 类型，可能没有 speed/current 字段，这里只填 angle
         }
 
         publisher_->publish(msg);
@@ -195,27 +178,27 @@ private:
         }
     }
 
-    // --- 目标回调 (IhbTarget) ---
+    // --- 目标回调 (适配新 IhbTarget.msg) ---
     void target_callback(const ihb_msgs::msg::IhbTarget::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(mtx_);
         
-        // 1. 伺服电机控制 (ServoMotorJointTarget[4])
-        // Msg中是固定数组，直接访问下标 0-3
-        // 注意：IhbTarget 的 ServoMotorJointTarget 结构体里应该有 angle 和 speed_limit
-        ser1_.setPositonWithSpeedLimit(msg->servo_joints[0].angle, msg->servo_joints[0].speed_limit);
-        ser2_.setPositonWithSpeedLimit(msg->servo_joints[1].angle, msg->servo_joints[1].speed_limit);
-        ser3_.setPositonWithSpeedLimit(msg->servo_joints[2].angle, msg->servo_joints[2].speed_limit);
-        ser4_.setPositonWithSpeedLimit(msg->servo_joints[3].angle, msg->servo_joints[3].speed_limit);
+        // 1. 伺服电机控制 (字段名: servo_joint, 大小: 4)
+        // 假设 ServoMotorJointTarget 包含 angle 和 speed_limit
+        // 这里的索引访问方式适配固定数组 array[4]
+        ser1_.setPositonWithSpeedLimit(msg->servo_joint[0].angle, msg->servo_joint[0].speed_limit);
+        ser2_.setPositonWithSpeedLimit(msg->servo_joint[1].angle, msg->servo_joint[1].speed_limit);
+        ser3_.setPositonWithSpeedLimit(msg->servo_joint[2].angle, msg->servo_joint[2].speed_limit);
+        ser4_.setPositonWithSpeedLimit(msg->servo_joint[3].angle, msg->servo_joint[3].speed_limit);
 
-        // 2. 肌肉关节控制 (MuscleJointTarget[8])
+        // 2. 肌肉关节控制 (字段名: muscle_joint, 大小: 8)
         for (int i = 0; i < 8; i++) {
-            muscle_joints_[i].setTargetAngle(msg->muscle_joints[i].angle[0], msg->muscle_joints[i].angle[1]);
+            muscle_joints_[i].setTargetAngle(msg->muscle_joint[i].angle[0], msg->muscle_joint[i].angle[1]);
             
-            // 如果指令是 PID_CONTROL (2)，更新 PID 参数
+            // 检查 CMD 模式 (CMD_PID_CONTROL = 2)
             if (msg->cmd == ihb_msgs::msg::IhbTarget::CMD_PID_CONTROL) {
                 muscle_joints_[i].setPidParameters(
-                    msg->muscle_joints[i].kp[0], msg->muscle_joints[i].ki[0], msg->muscle_joints[i].kd[0],
-                    msg->muscle_joints[i].kp[1], msg->muscle_joints[i].ki[1], msg->muscle_joints[i].kd[1]
+                    msg->muscle_joint[i].kp[0], msg->muscle_joint[i].ki[0], msg->muscle_joint[i].kd[0],
+                    msg->muscle_joint[i].kp[1], msg->muscle_joint[i].ki[1], msg->muscle_joint[i].kd[1]
                 );
             }
         }
@@ -268,7 +251,6 @@ private:
                     else if (id == 0x144) ser4_.processCanMessage(data);
                     
                     // 肌肉关节阀岛反馈 (假设 ID 为 0x180 + JointID)
-                    // JointID 0-7 => CAN ID 0x180 - 0x187
                     else if ((id >> 4) == 0x18) {
                         uint8_t idx = id & 0x0F;
                         if(idx < 8) muscle_joints_[idx].processCanMessage(data);
@@ -297,7 +279,6 @@ private:
         for(int i=0; i<8; i++) {
             muscle_joints_[i].setId(i);
             muscle_joints_[i].setCanDriver(shared_can_driver_);
-            // 初始PID归零，等待主端下发
             muscle_joints_[i].setPidParameters(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         }
         
@@ -322,7 +303,7 @@ private:
     ihb::MuscleJoint muscle_joints_[8]; // 0-7
     ihb::ServoMotorJoint ser1_, ser2_, ser3_, ser4_;
 
-    // 适配新的消息类型
+    // ROS 通信
     rclcpp::Publisher<ihb_msgs::msg::IhbStatus>::SharedPtr publisher_;
     rclcpp::Subscription<ihb_msgs::msg::IhbTarget>::SharedPtr subscriber_;
     

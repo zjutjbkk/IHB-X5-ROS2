@@ -145,15 +145,15 @@ if (log_file_.is_open()) {
     // ... 其余逻辑保持不变 ...
     void target_callback(const ihb_msgs::msg::ArmTarget::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(mtx_);
-        if (msg->servo_joints.size() >= 2) {
-            ser1_.setPositonWithSpeedLimit(msg->servo_joints[0].angle, msg->servo_joints[0].speed_limit);
-            ser2_.setPositonWithSpeedLimit(msg->servo_joints[1].angle, msg->servo_joints[1].speed_limit);
+        if (msg->servo_joint.size() >= 2) {
+            ser1_.setPositonWithSpeedLimit(msg->servo_joint[0].angle, msg->servo_joint[0].speed_limit);
+            ser2_.setPositonWithSpeedLimit(msg->servo_joint[1].angle, msg->servo_joint[1].speed_limit);
         }
-        for (size_t i = 0; i < msg->muscle_joints.size() && i < 4; i++) {
-            muscle_joints_[i].setTargetAngle(msg->muscle_joints[i].angle[0], msg->muscle_joints[i].angle[1]);
+        for (size_t i = 0; i < msg->muscle_joint.size() && i < 4; i++) {
+            muscle_joints_[i].setTargetAngle(msg->muscle_joint[i].angle[0], msg->muscle_joint[i].angle[1]);
             if (msg->cmd == 2) {
-                muscle_joints_[i].setPidParameters(msg->muscle_joints[i].kp[0], msg->muscle_joints[i].ki[0], msg->muscle_joints[i].kd[0],
-                                                   msg->muscle_joints[i].kp[1], msg->muscle_joints[i].ki[1], msg->muscle_joints[i].kd[1]);
+                muscle_joints_[i].setPidParameters(msg->muscle_joint[i].kp[0], msg->muscle_joint[i].ki[0], msg->muscle_joint[i].kd[0],
+                                                   msg->muscle_joint[i].kp[1], msg->muscle_joint[i].ki[1], msg->muscle_joint[i].kd[1]);
             }
         }
     }

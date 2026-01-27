@@ -52,16 +52,16 @@ public:
 
         // 设置 肌肉关节  换平台记得改
 
-        muscle_joints[0].setId(0);
-        muscle_joints[1].setId(1);
-        muscle_joints[2].setId(3);
-        muscle_joints[3].setId(4);
+        muscle_joint[0].setId(0);
+        muscle_joint[1].setId(1);
+        muscle_joint[2].setId(3);
+        muscle_joint[3].setId(4);
 
         // 设置 PID 参数（参考 pid.cpp 中的配置）
-        muscle_joints[0].setPidParameters(30, 1.8, 120); // muscle1
-        muscle_joints[1].setPidParameters(60, 5, 200);   // muscle2
-        muscle_joints[2].setPidParameters(300, 10, 150); // muscle3
-        muscle_joints[3].setPidParameters(250, 20, 200); // muscle4
+        muscle_joint[0].setPidParameters(30, 1.8, 120); // muscle1
+        muscle_joint[1].setPidParameters(60, 5, 200);   // muscle2
+        muscle_joint[2].setPidParameters(300, 10, 150); // muscle3
+        muscle_joint[3].setPidParameters(250, 20, 200); // muscle4
         // 其余没使用
 
         // 初始化所有肌肉关节的 PID 启用状态为 false
@@ -116,7 +116,7 @@ public:
                            msg->pressure[0], msg->pressure[1], msg->pressure[2], msg->pressure[3]);
 
                 // 使用已初始化的对象，而不是重复创建
-                auto& muscle_joint = muscle_joints[msg->id];
+                auto& muscle_joint = muscle_joint[msg->id];
 
                 switch (msg->cmd)
                 {
@@ -390,15 +390,15 @@ public:
         // 肌肉关节 id angle pressure stiffness
         for (int i = 0; i < 8; i++)
         {
-            message.muscle_joint[i].id = muscle_joints[i].id();
+            message.muscle_joint[i].id = muscle_joint[i].id();
 
             // 读取气压和刚度（这些方法内部有互斥锁保护，线程安全）
-            muscle_joints[i].getPressure(
+            muscle_joint[i].getPressure(
                 message.muscle_joint[i].pressure[0],
                 message.muscle_joint[i].pressure[1],
                 message.muscle_joint[i].pressure[2],
                 message.muscle_joint[i].pressure[3]);
-            muscle_joints[i].getStiffness(
+            muscle_joint[i].getStiffness(
                 message.muscle_joint[i].stiffness[0],
                 message.muscle_joint[i].stiffness[1]);
         }
@@ -500,12 +500,12 @@ public:
                         break;
                         case 0x18: // 肌肉板返回数据
                         {
-                            muscle_joints[canId & 0x0F].processCanMessage(data);
+                            muscle_joint[canId & 0x0F].processCanMessage(data);
                             // 调试日志（可选）
                             // RCLCPP_DEBUG(this->get_logger(), "Muscle joint heard: %d '%d' '%d' '%d'",
-                            //             canId, muscle_joints[canId & 0x0F].id(),
-                            //             muscle_joints[canId & 0x0F].Angle1(),
-                            //             muscle_joints[canId & 0x0F].Angle2());
+                            //             canId, muscle_joint[canId & 0x0F].id(),
+                            //             muscle_joint[canId & 0x0F].Angle1(),
+                            //             muscle_joint[canId & 0x0F].Angle2());
                         }
                         break;
 
@@ -667,17 +667,17 @@ public:
             hall_angles[7] = angles[0];
 
             // ========== 步骤 3: 更新角度数据到 MuscleJoint 对象 ==========
-            muscle_joints[0].processAngle(hall_angles[0], hall_angles[1]);
-            muscle_joints[1].processAngle(hall_angles[2], hall_angles[3]);
-            muscle_joints[2].processAngle(hall_angles[4], hall_angles[5]);
-            muscle_joints[3].processAngle(hall_angles[6], hall_angles[7]);
+            muscle_joint[0].processAngle(hall_angles[0], hall_angles[1]);
+            muscle_joint[1].processAngle(hall_angles[2], hall_angles[3]);
+            muscle_joint[2].processAngle(hall_angles[4], hall_angles[5]);
+            muscle_joint[3].processAngle(hall_angles[6], hall_angles[7]);
 
             // ========== 步骤 4: 执行 PID 计算和气压输出（只更新启用了 PID 的肌肉关节）==========
             for (int i = 0; i < 4; i++)
             {
                 if (muscle_joint_pid_enabled_[i].load())
                 {
-                    muscle_joints[i].update();
+                    muscle_joint[i].update();
                 }
             }
 
@@ -690,7 +690,7 @@ public:
         RCLCPP_INFO(this->get_logger(), "✓ PID 控制线程正在停止，归零所有气压输出...");
         for (int i = 0; i < 8; i++)
         {
-            muscle_joints[i].setPressure(0, 0, 0, 0);
+            muscle_joint[i].setPressure(0, 0, 0, 0);
         }
 
         RCLCPP_INFO(this->get_logger(), "✓ PID 控制线程已退出");
@@ -791,7 +791,7 @@ public:
         {
             if (id >= 0 && id < 8)
             {
-                muscle_joints[id].setPressure(0, 0, 0, 0);
+                muscle_joint[id].setPressure(0, 0, 0, 0);
             }
         }
 
@@ -874,13 +874,13 @@ public:
         // 1. 先控制伺服电机移动到目标位置（直接使用消息中的 ID）
         for (int i = 0; i < 2; i++)
         {
-            int servo_id = msg->servo_joints[i].id;
+            int servo_id = msg->servo_joint[i].id;
             RCLCPP_INFO(this->get_logger(), "设置伺服电机 ID=%d, 角度=%f, 速度限制=%d",
-                        servo_id, msg->servo_joints[i].angle, msg->servo_joints[i].speed_limit);
+                        servo_id, msg->servo_joint[i].angle, msg->servo_joint[i].speed_limit);
 
             servo_motor_joints[servo_id - 1].setPositonWithSpeedLimit(
-                msg->servo_joints[i].angle,
-                msg->servo_joints[i].speed_limit);
+                msg->servo_joint[i].angle,
+                msg->servo_joint[i].speed_limit);
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
 
@@ -888,15 +888,15 @@ public:
         std::array<float, 10> joint_angles;
 
         // 从消息中提取角度数据
-        // servo_joints[0] 和 servo_joints[1] 提供 2 个角度
-        // muscle_joints[0-3] 每个提供 2 个角度，共 8 个角度
-        joint_angles[0] = static_cast<float>(msg->servo_joints[0].angle) / 100.0f; // 伺服电机角度需要除以100
-        joint_angles[1] = static_cast<float>(msg->servo_joints[1].angle) / 100.0f;
+        // servo_joint[0] 和 servo_joint[1] 提供 2 个角度
+        // muscle_joint[0-3] 每个提供 2 个角度，共 8 个角度
+        joint_angles[0] = static_cast<float>(msg->servo_joint[0].angle) / 100.0f; // 伺服电机角度需要除以100
+        joint_angles[1] = static_cast<float>(msg->servo_joint[1].angle) / 100.0f;
 
         for (int i = 0; i < 4; i++)
         {
-            joint_angles[2 + i * 2] = static_cast<float>(msg->muscle_joints[i].angle[0]);
-            joint_angles[3 + i * 2] = static_cast<float>(msg->muscle_joints[i].angle[1]);
+            joint_angles[2 + i * 2] = static_cast<float>(msg->muscle_joint[i].angle[0]);
+            joint_angles[3 + i * 2] = static_cast<float>(msg->muscle_joint[i].angle[1]);
         }
 
         // --- 新增功能：检查所有角度是否都为零 ---
@@ -913,8 +913,8 @@ public:
             // 遍历所有相关的肌肉关节，并将它们的气压设置为0
             for (int i = 0; i < 4; i++)
             {
-                int muscle_id = msg->muscle_joints[i].id;
-                muscle_joints[muscle_id].setPressure(0, 0, 0, 0);
+                int muscle_id = msg->muscle_joint[i].id;
+                muscle_joint[muscle_id].setPressure(0, 0, 0, 0);
             }
 
             // 提前返回，不再执行后续的计算 因为静力学模型计算会有一点点输出 既然全是0 直接全部归零就好了
@@ -929,7 +929,7 @@ public:
             // 4. 将气压值应用到 4 个肌肉关节（直接使用消息中的 ID）
             for (int i = 0; i < 4; i++)
             {
-                int muscle_id = msg->muscle_joints[i].id;
+                int muscle_id = msg->muscle_joint[i].id;
                 int pressure_base = i * 4;
 
                 RCLCPP_INFO(this->get_logger(), "设置肌肉关节 ID=%d, 气压=[%d, %d, %d, %d]",
@@ -939,7 +939,7 @@ public:
                             static_cast<uint16_t>(muscle_pressures[pressure_base + 2]),
                             static_cast<uint16_t>(muscle_pressures[pressure_base + 3]));
 
-                muscle_joints[muscle_id].setPressure(
+                muscle_joint[muscle_id].setPressure(
                     static_cast<uint16_t>(muscle_pressures[pressure_base + 0]),
                     static_cast<uint16_t>(muscle_pressures[pressure_base + 1]),
                     static_cast<uint16_t>(muscle_pressures[pressure_base + 2]),
@@ -964,15 +964,15 @@ public:
         std::array<float, 10> joint_angles;
 
         // 从消息中提取角度数据
-        // servo_joints[0] 和 servo_joints[1] 提供 2 个角度
-        // muscle_joints[0-3] 每个提供 2 个角度，共 8 个角度
-        joint_angles[0] = static_cast<float>(msg->servo_joints[0].angle) / 100.0f; // 伺服电机角度需要除以100
-        joint_angles[1] = static_cast<float>(msg->servo_joints[1].angle) / 100.0f;
+        // servo_joint[0] 和 servo_joint[1] 提供 2 个角度
+        // muscle_joint[0-3] 每个提供 2 个角度，共 8 个角度
+        joint_angles[0] = static_cast<float>(msg->servo_joint[0].angle) / 100.0f; // 伺服电机角度需要除以100
+        joint_angles[1] = static_cast<float>(msg->servo_joint[1].angle) / 100.0f;
 
         for (int i = 0; i < 4; i++)
         {
-            joint_angles[2 + i * 2] = static_cast<float>(msg->muscle_joints[i].angle[0]);
-            joint_angles[3 + i * 2] = static_cast<float>(msg->muscle_joints[i].angle[1]);
+            joint_angles[2 + i * 2] = static_cast<float>(msg->muscle_joint[i].angle[0]);
+            joint_angles[3 + i * 2] = static_cast<float>(msg->muscle_joint[i].angle[1]);
         }
 
         // 检查所有角度是否都为零
@@ -988,7 +988,7 @@ public:
             std::vector<int> muscle_ids_to_stop;
             for (int i = 0; i < 4; i++)
             {
-                muscle_ids_to_stop.push_back(msg->muscle_joints[i].id);
+                muscle_ids_to_stop.push_back(msg->muscle_joint[i].id);
             }
 
             // 停止对应肌肉关节的 PID 控制
@@ -1001,27 +1001,27 @@ public:
         // 2. 设置伺服电机目标位置（直接使用消息中的 ID）
         for (int i = 0; i < 2; i++)
         {
-            int servo_id = msg->servo_joints[i].id;
+            int servo_id = msg->servo_joint[i].id;
             RCLCPP_INFO(this->get_logger(), "设置伺服电机 ID=%d, 角度=%f, 速度限制=%d",
-                        servo_id, msg->servo_joints[i].angle, msg->servo_joints[i].speed_limit);
+                        servo_id, msg->servo_joint[i].angle, msg->servo_joint[i].speed_limit);
 
             servo_motor_joints[servo_id - 1].setPositonWithSpeedLimit(
-                msg->servo_joints[i].angle,
-                msg->servo_joints[i].speed_limit);
+                msg->servo_joint[i].angle,
+                msg->servo_joint[i].speed_limit);
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
 
         // 3. 设置肌肉关节目标角度并启用 PID（直接使用消息中的 ID）
         for (int i = 0; i < 4; i++)
         {
-            int muscle_id = msg->muscle_joints[i].id;
+            int muscle_id = msg->muscle_joint[i].id;
 
             RCLCPP_INFO(this->get_logger(), "设置肌肉关节 ID=%d, 目标角度=[%.2f, %.2f]",
-                        muscle_id, msg->muscle_joints[i].angle[0], msg->muscle_joints[i].angle[1]);
+                        muscle_id, msg->muscle_joint[i].angle[0], msg->muscle_joint[i].angle[1]);
 
-            muscle_joints[muscle_id].setTargetAngle(
-                msg->muscle_joints[i].angle[0],
-                msg->muscle_joints[i].angle[1]);
+            muscle_joint[muscle_id].setTargetAngle(
+                msg->muscle_joint[i].angle[0],
+                msg->muscle_joint[i].angle[1]);
 
             // 启用该肌肉关节的 PID 控制
             muscle_joint_pid_enabled_[muscle_id].store(true);
@@ -1104,7 +1104,7 @@ private:
     rclcpp::Subscription<ihb_msgs::msg::ArmTarget>::SharedPtr left_arm_target_sub_;
 
     // 8 个肌肉关节 使用vector
-    ihb::MuscleJoint muscle_joints[8];
+    ihb::MuscleJoint muscle_joint[8];
     // 4个伺服电机
     ihb::ServoMotorJoint servo_motor_joints[4];
     // 1个步进电机

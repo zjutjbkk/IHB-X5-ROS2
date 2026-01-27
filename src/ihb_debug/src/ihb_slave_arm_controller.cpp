@@ -87,7 +87,7 @@ private:
         std::lock_guard<std::mutex> lock(mtx_);
         
         // 1. 电机动态分发 (适配主端 ID 1-4)
-        for (const auto & servo : msg->servo_joints) {
+        for (const auto & servo : msg->servo_joint) {
             if (servo.id == 1) ser1_.setPositonWithSpeedLimit(servo.angle, servo.speed_limit);
             else if (servo.id == 2) ser2_.setPositonWithSpeedLimit(servo.angle, servo.speed_limit);
             else if (servo.id == 3) ser3_.setPositonWithSpeedLimit(servo.angle, servo.speed_limit);
@@ -95,7 +95,7 @@ private:
         }
 
         // 2. 肌肉关节动态分发 (适配 8 个肌肉关节)
-        for (const auto & mj_target : msg->muscle_joints) {
+        for (const auto & mj_target : msg->muscle_joint) {
             uint8_t id = mj_target.id;
             if (id >= 1 && id <= 8) {
                 muscle_joints_[id-1].setTargetAngle(mj_target.angle[0], mj_target.angle[1]);

@@ -11,7 +11,7 @@ uint32 cmd
 
 # --- 关节定义 ---
 # 2个舵机关节: 数组大小固定为 2
-ServoMotorJointTarget[2] servo_joints
+ServoMotorJointTarget[2] servo_joint
 
 # 4个肌肉关节: 数组大小固定为 4
-MuscleJointTarget[4] muscle_joints
+MuscleJointTarget[4] muscle_joint

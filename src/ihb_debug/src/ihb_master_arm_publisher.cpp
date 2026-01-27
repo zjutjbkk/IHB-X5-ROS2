@@ -60,22 +60,21 @@ private:
             // 这里的逻辑是：主臂的 4 个传感器读数，直接传给从臂的 4 个电机目标
 
             // 从臂左电机 1 & 2 (由主臂 hall 0 和 1 决定)
-            target_msg.servo_joints[0].id = 1;
-            target_msg.servo_joints[0].angle = hall_angles[2];
-            target_msg.servo_joints[0].speed_limit = 120.0;
+            target_msg.servo_joint[0].id = 1;
+            target_msg.servo_joint[0].angle = hall_angles[2];
+            target_msg.servo_joint[0].speed_limit = 120.0;
 
-            target_msg.servo_joints[1].id = 2;
-            target_msg.servo_joints[1].angle = hall_angles[3];
-            target_msg.servo_joints[1].speed_limit = 120.0;
-
+            target_msg.servo_joint[1].id = 2;
+            target_msg.servo_joint[1].angle = hall_angles[3];
+            target_msg.servo_joint[1].speed_limit = 120.0;
             // 【左臂电机】: 主端 Hall 4, 5 -> 从端 ID 1, 2
-            target_msg.servo_joints[2].id = 3;
-            target_msg.servo_joints[2].angle = hall_angles[10];
-            target_msg.servo_joints[2].speed_limit = 120.0;
+            target_msg.servo_joint[2].id = 3;
+            target_msg.servo_joint[2].angle = hall_angles[10];
+            target_msg.servo_joint[2].speed_limit = 120.0;
 
-            target_msg.servo_joints[3].id = 4;
-            target_msg.servo_joints[3].angle = hall_angles[11];
-            target_msg.servo_joints[3].speed_limit = 120.0;
+            target_msg.servo_joint[3].id = 4;
+            target_msg.servo_joint[3].angle = hall_angles[11];
+            target_msg.servo_joint[3].speed_limit = 120.0;
 
             // ================= 2. 肌肉关节 1对4 映射逻辑 =================
             // static const float kp_table[4][2] = {{250.0, 180.0}, {180.0, 160.0}, {180.0, 240.0}, {240.0, 220.0}};
@@ -94,29 +93,29 @@ private:
 
             for (int i = 0; i < 8; i++)
             {
-                target_msg.muscle_joints[i].id = i + 1;
+                target_msg.muscle_joint[i].id = i + 1;
 
                 if (i < 4) // 前 4 个从臂关节映射给右侧主臂传感器
                 {
-                    target_msg.muscle_joints[i].angle[0] = R_master_a0;
-                    target_msg.muscle_joints[i].angle[1] = R_master_a1;
-                    target_msg.muscle_joints[i].kp[0] = kp_table[i][0];
-                    target_msg.muscle_joints[i].ki[0] = ki_table[i][0];
-                    target_msg.muscle_joints[i].kd[0] = kd_table[i][0];
-                    target_msg.muscle_joints[i].kp[1] = kp_table[i][1];
-                    target_msg.muscle_joints[i].ki[1] = ki_table[i][1];
-                    target_msg.muscle_joints[i].kd[1] = kd_table[i][1];
+                    target_msg.muscle_joint[i].angle[0] = R_master_a0;
+                    target_msg.muscle_joint[i].angle[1] = R_master_a1;
+                    target_msg.muscle_joint[i].kp[0] = kp_table[i][0];
+                    target_msg.muscle_joint[i].ki[0] = ki_table[i][0];
+                    target_msg.muscle_joint[i].kd[0] = kd_table[i][0];
+                    target_msg.muscle_joint[i].kp[1] = kp_table[i][1];
+                    target_msg.muscle_joint[i].ki[1] = ki_table[i][1];
+                    target_msg.muscle_joint[i].kd[1] = kd_table[i][1];
                 }
                 else // 后 4 个从臂关节映射给左侧主臂传感器
                 {
-                    target_msg.muscle_joints[i].angle[0] = L_master_a0;
-                    target_msg.muscle_joints[i].angle[1] = L_master_a1;
-                    target_msg.muscle_joints[i].kp[0] = kp_table[i - 4][0];
-                    target_msg.muscle_joints[i].ki[0] = ki_table[i - 4][0];
-                    target_msg.muscle_joints[i].kd[0] = kd_table[i - 4][0];
-                    target_msg.muscle_joints[i].kp[1] = kp_table[i - 4][1];
-                    target_msg.muscle_joints[i].ki[1] = ki_table[i - 4][1];
-                    target_msg.muscle_joints[i].kd[1] = kd_table[i - 4][1];
+                    target_msg.muscle_joint[i].angle[0] = L_master_a0;
+                    target_msg.muscle_joint[i].angle[1] = L_master_a1;
+                    target_msg.muscle_joint[i].kp[0] = kp_table[i - 4][0];
+                    target_msg.muscle_joint[i].ki[0] = ki_table[i - 4][0];
+                    target_msg.muscle_joint[i].kd[0] = kd_table[i - 4][0];
+                    target_msg.muscle_joint[i].kp[1] = kp_table[i - 4][1];
+                    target_msg.muscle_joint[i].ki[1] = ki_table[i - 4][1];
+                    target_msg.muscle_joint[i].kd[1] = kd_table[i - 4][1];
                 }
             }
 
