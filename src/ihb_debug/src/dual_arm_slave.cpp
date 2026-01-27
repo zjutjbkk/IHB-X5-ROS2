@@ -185,10 +185,16 @@ private:
         // 1. 伺服电机控制 (字段名: servo_joint, 大小: 4)
         // 假设 ServoMotorJointTarget 包含 angle 和 speed_limit
         // 这里的索引访问方式适配固定数组 array[4]
-        ser1_.setPositonWithSpeedLimit(msg->servo_joint[0].angle, msg->servo_joint[0].speed_limit);
-        ser2_.setPositonWithSpeedLimit(msg->servo_joint[1].angle, msg->servo_joint[1].speed_limit);
-        ser3_.setPositonWithSpeedLimit(msg->servo_joint[2].angle, msg->servo_joint[2].speed_limit);
-        ser4_.setPositonWithSpeedLimit(msg->servo_joint[3].angle, msg->servo_joint[3].speed_limit);
+        // RCLCPP_INFO(this->get_logger(), 
+        // "Received Servo Angles: [0]:%.2f, [1]:%.2f, [2]:%.2f, [3]:%.2f",
+        // msg->servo_joint[0].angle, 
+        // msg->servo_joint[1].angle, 
+        // msg->servo_joint[2].angle, 
+        // msg->servo_joint[3].angle);
+        ser1_.setPositonWithSpeedLimit(msg->servo_joint[0].angle*100, msg->servo_joint[0].speed_limit);
+        ser2_.setPositonWithSpeedLimit(msg->servo_joint[1].angle*100, msg->servo_joint[1].speed_limit);
+        ser3_.setPositonWithSpeedLimit(msg->servo_joint[2].angle*100, msg->servo_joint[2].speed_limit);
+        ser4_.setPositonWithSpeedLimit(msg->servo_joint[3].angle*100, msg->servo_joint[3].speed_limit);
 
         // 2. 肌肉关节控制 (字段名: muscle_joint, 大小: 8)
         for (int i = 0; i < 8; i++) {

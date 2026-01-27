@@ -20,7 +20,7 @@ public:
         read_thread_ = std::thread([this]() {
             while (rclcpp::ok()) {
                 // 优化：使用线程安全的批量读取接口，一次获取所有传感器数据
-                std::vector<float> hall_angles = hall_sensors_.getAllAngles();
+                std::vector<float> hall_angles = hall_sensors_.getAllFilteredAngles();
 
                 // 直接读取并打印所有传感器值
                 std::stringstream ss;

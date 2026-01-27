@@ -167,7 +167,7 @@ private:
 
     // 2. 填充 霍尔传感器 / 肌肉关节 数据
     // -------------------------------------------------
-    std::vector<float> hall_angles = hall_sensors_.getAllAngles();
+    std::vector<float> hall_angles = hall_sensors_.getAllFilteredAngles();
 
     for (int i = 0; i < 4; i++) {
       message.muscle_joint[i].id = i + 1;     

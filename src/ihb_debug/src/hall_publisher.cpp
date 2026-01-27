@@ -44,7 +44,7 @@ private:
     message.header.stamp = this->now();
     message.header.frame_id = "base_link";
 
-    std::vector<float> raw_angles = hall_sensors_.getAllAngles();
+    std::vector<float> raw_angles = hall_sensors_.getAllFilteredAngles();
     if (raw_angles.size() < 16) 
     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
         "等待传感器数据... 当前长度: %zu (需要16)", raw_angles.size());

@@ -121,7 +121,7 @@ private:
         message.header.frame_id = "base_link";
 
         // A. 霍尔角度填充
-        std::vector<float> hall_angles = hall_sensors_.getAllAngles();
+        std::vector<float> hall_angles = hall_sensors_.getAllFilteredAngles();
         for (int i = 0; i < 4; i++) {
             message.muscle_joint[i].id = i + 1;
             message.muscle_joint[i].angle[0] = static_cast<int16_t>(hall_angles[i]);

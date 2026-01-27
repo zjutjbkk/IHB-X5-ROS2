@@ -205,7 +205,7 @@ public:
       std::this_thread::sleep_for(std::chrono::seconds(1));
 
       // 测试所有传感器是否正常工作
-      std::vector<float> test_angles = hall_sensors_.getAllAngles();
+      std::vector<float> test_angles = hall_sensors_.getAllFilteredAngles();
       int working_sensors = 0;
       for (int i = 0; i < 16; i++) {
         if (std::abs(test_angles[i]) > 0.1) { // 检查是否有有效读数
@@ -371,7 +371,7 @@ private:
     message.header.frame_id = "";
 
     // 优化：使用线程安全的批量读取接口，一次性获取所有传感器数据
-    std::vector<float> hall_angles = hall_sensors_.getAllAngles();
+    std::vector<float> hall_angles = hall_sensors_.getAllFilteredAngles();
 
     // 左臂前四个肌肉关节映射 (保持原有角度关系不变)
     // 第一个肌肉：角度1 = 传感器0，角度2 = 传感器7

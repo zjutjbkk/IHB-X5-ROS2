@@ -110,7 +110,7 @@ private:
     void pid_control_loop() {
     while (g_running_ && rclcpp::ok()) {
         // 从端 16 路传感器数据
-        std::vector<float> halls = hall_sensors_.getAllAngles();
+        std::vector<float> halls = hall_sensors_.getAllFilteredAngles();
         
         if (halls.size() >= 16) {
             std::lock_guard<std::mutex> lock(mtx_);
@@ -136,7 +136,7 @@ private:
 void publish_status_callback() {
     auto msg = ihb_msgs::msg::IhbArmStatus();
     msg.header.stamp = this->now();
-    std::vector<float> halls = hall_sensors_.getAllAngles();
+    std::vector<float> halls = hall_sensors_.getAllFilteredAngles();
 
     // --- 1. 填充 8 个肌肉关节数据 (对应从端 16 个传感器) ---
     if (halls.size() >= 16) {

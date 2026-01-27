@@ -378,8 +378,8 @@ public:
         }
 
         // ========== 读取霍尔传感器角度并填充到肌肉关节 ==========
-        // 获取所有霍尔传感器角度（getAllAngles 内部有互斥锁保护，线程安全）
-        std::vector<float> hall_angles_raw = hall.getAllAngles();
+        // 获取所有霍尔传感器角度（getAllFilteredAngles 内部有互斥锁保护，线程安全）
+        std::vector<float> hall_angles_raw = hall.getAllFilteredAngles();
 
         // 根据 pidControlLoop 中的映射关系，将霍尔角度映射到肌肉关节
         // 肌肉关节 0: hall_angles[0] = -angles[11], hall_angles[1] = angles[3]
@@ -594,11 +594,11 @@ public:
             // 压力传感器
 
             // 优化：使用线程安全的批量读取接口
-            std::vector<float> hall_angles = hall.getAllAngles();
+            std::vector<float> hall_angles = hall.getAllFilteredAngles();
             for (size_t i = 0; i < 16; i++)
             {
                 logBuffer << hall_angles[i] << "\t";
-                // RCLCPP_DEBUG(this->get_logger(), "hall.getAllAngles()[%d] = %f", i, hall_angles[i]);
+                // RCLCPP_DEBUG(this->get_logger(), "hall.getAllFilteredAngles()[%d] = %f", i, hall_angles[i]);
             }
             // for (size_t i = 0; i < 32; i++)
             // {
@@ -656,7 +656,7 @@ public:
             // ========== 步骤 2: 读取霍尔传感器角度 ==========
             // 参考 pid.cpp 中的角度映射关系
             float hall_angles[8];
-            std::vector<float> angles = hall.getAllAngles();
+            std::vector<float> angles = hall.getAllFilteredAngles();
             hall_angles[0] = -angles[11];
             hall_angles[1] = angles[3];
             hall_angles[2] = -angles[10];

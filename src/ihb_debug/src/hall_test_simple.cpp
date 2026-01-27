@@ -31,7 +31,7 @@ private:
     void publish_sensor_data()
     {
         // 优化：使用线程安全的批量读取接口
-        std::vector<float> hall_angles = hall_sensors_.getAllAngles();
+        std::vector<float> hall_angles = hall_sensors_.getAllFilteredAngles();
 
         // 添加调试输出：直接显示传感器8-15的原始值
         RCLCPP_INFO(this->get_logger(), "===== 简化测试：传感器8-15原始数据 (线程安全版本) =====");

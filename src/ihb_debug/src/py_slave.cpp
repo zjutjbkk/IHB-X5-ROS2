@@ -88,7 +88,7 @@ private:
     void publish_status_callback() {
         auto msg = ihb_msgs::msg::SingleArmStatus();
         msg.header.stamp = this->now();
-        std::vector<float> halls = hall_sensors_.getAllAngles();
+        std::vector<float> halls = hall_sensors_.getAllFilteredAngles();
         
         for (int i = 0; i < 4; i++) {
             msg.muscle_joint[i].id = i + 1;
@@ -160,7 +160,7 @@ if (log_file_.is_open()) {
 
     void pid_control_loop() {
         while (g_running_ && rclcpp::ok()) {
-            std::vector<float> halls = hall_sensors_.getAllAngles();
+            std::vector<float> halls = hall_sensors_.getAllFilteredAngles();
             if (halls.size() >= 8) {
                 std::lock_guard<std::mutex> lock(mtx_); 
                 for (int i = 0; i < 4; i++) {

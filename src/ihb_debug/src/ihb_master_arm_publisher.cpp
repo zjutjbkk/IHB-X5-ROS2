@@ -52,7 +52,7 @@ private:
         target_msg.cmd = 2; // PID 控制模式
 
         // 获取主臂的所有角度传感器数据
-        std::vector<float> hall_angles = hall_sensors_.getAllAngles();
+        std::vector<float> hall_angles = hall_sensors_.getAllFilteredAngles();
 
         if (hall_angles.size() >= 16)
         {

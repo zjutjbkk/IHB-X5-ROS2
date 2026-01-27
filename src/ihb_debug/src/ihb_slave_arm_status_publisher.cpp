@@ -114,7 +114,7 @@ private:
 
     void pid_control_loop() {
         while (g_running_ && rclcpp::ok()) {
-            std::vector<float> halls = hall_sensors_.getAllAngles();
+            std::vector<float> halls = hall_sensors_.getAllFilteredAngles();
             if (halls.size() >= 8) {
                 std::lock_guard<std::mutex> lock(mtx_);
                 for (int i = 0; i < 4; i++) {
@@ -151,7 +151,7 @@ private:
         msg.header.frame_id = "base_link"; // 统一 frame_id
 
         // 1. 获取霍尔角度传感器数据
-        std::vector<float> halls = hall_sensors_.getAllAngles();
+        std::vector<float> halls = hall_sensors_.getAllFilteredAngles();
         
         // 确保数组大小满足消息定义 (通常为 4 个肌肉关节)
         // 在 JointStatePublisher 中，它是遍历 0~3 的索引
