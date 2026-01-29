@@ -11,13 +11,14 @@ set(CMAKE_BUILD_TYPE "Debug")
 find_package(Threads REQUIRED)
 
 add_executable(${PROJECT_NAME} main.cpp)
-add_executable(reset reset.cpp)
-add_executable(forceTest forceTest.cpp)
+# add_executable(reset reset.cpp)
+# add_executable(forceTest forceTest.cpp)
 add_executable(hallTest hallTest.cpp)
-add_executable(serangle serAngle.cpp)
-add_executable(canAngleThread canAngleTestThread.cpp)
-add_executable(step_motor step_motor.cpp)
-add_executable(statics_model_test statics_model_test.cpp)
+# add_executable(serangle serAngle.cpp)
+# add_executable(canAngleThread canAngleTestThread.cpp)
+# add_executable(step_motor step_motor.cpp)
+# add_executable(statics_model_test statics_model_test.cpp)
+add_executable(gripper gripper.cpp)
 
 
 # add_subdirectory(ihb_cpp)
@@ -39,18 +40,18 @@ target_link_libraries(${PROJECT_NAME}
     # ${IHB_CPP_LIB}
     # ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries( reset
-    ihb_cpp
-    # sockcanpp
-    # ${IHB_CPP_LIB}
-    # ${CMAKE_THREAD_LIBS_INIT}
-)
-target_link_libraries( forceTest
-    ihb_cpp
-    # sockcanpp
-    # ${IHB_CPP_LIB}
-    # ${CMAKE_THREAD_LIBS_INIT}
-)
+# target_link_libraries( reset
+#     ihb_cpp
+#     # sockcanpp
+#     # ${IHB_CPP_LIB}
+#     # ${CMAKE_THREAD_LIBS_INIT}
+# )
+# target_link_libraries( forceTest
+#     ihb_cpp
+#     # sockcanpp
+#     # ${IHB_CPP_LIB}
+#     # ${CMAKE_THREAD_LIBS_INIT}
+# )
 
 target_link_libraries( hallTest
     ihb_cpp
@@ -58,16 +59,27 @@ target_link_libraries( hallTest
     # ${IHB_CPP_LIB}
     # ${CMAKE_THREAD_LIBS_INIT}
 )
-target_link_libraries( serangle
+# target_link_libraries( serangle
+#     ihb_cpp
+#     # sockcanpp
+#     # ${IHB_CPP_LIB}
+#     # ${CMAKE_THREAD_LIBS_INIT}
+# )
+
+target_link_libraries(gripper
     ihb_cpp
     # sockcanpp
     # ${IHB_CPP_LIB}
     # ${CMAKE_THREAD_LIBS_INIT}
+
+
 )
-target_link_libraries( canAngleThread
-    ihb_cpp
-)
-target_link_libraries(step_motor ihb_cpp)
-target_link_libraries(statics_model_test ihb_cpp)
+
+
+# target_link_libraries( canAngleThread
+#     ihb_cpp
+# )
+# target_link_libraries(step_motor ihb_cpp)
+# target_link_libraries(statics_model_test ihb_cpp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${INC_DIRS})
