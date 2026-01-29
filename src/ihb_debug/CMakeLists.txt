@@ -42,7 +42,7 @@ add_executable(ihb_slave_arm_status_publisher src/ihb_slave_arm_status_publisher
 # add_executable(hall_test_simple src/hall_test_simple.cpp)
 add_executable(ihb_armstatus_publisher src/ihb_armstatus_publisher.cpp)
 add_executable(ihb_slave_arm_controller src/ihb_slave_arm_controller.cpp)
-add_executable(ihb_master_arm_publisher src/ihb_master_arm_publisher.cpp) 
+add_executable(ihb_master_arm_publisher src/ihb_master_arm_publisher.cpp lib/ihb_cpp/ihb_cpp/src/gripper_switch.cpp ) 
 add_executable(dual_arm_slave src/dual_arm_slave.cpp)
 
 # target_link_libraries(ihb_debug_node ihb_cpp)

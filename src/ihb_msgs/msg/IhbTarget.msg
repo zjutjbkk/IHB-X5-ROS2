@@ -15,3 +15,9 @@ ServoMotorJointTarget[4] servo_joint
 
 # 8个肌肉关节: 数组大小固定为 8
 MuscleJointTarget[8] muscle_joint
+
+# --- 2. 夹爪/末端反馈 (GPIO) ---
+# 对应你的两个 GPIO 开关 (GripperSwitch.isTriggered)
+# true = 闭合/接触, false = 松开/悬空
+bool left_gripper_touched   # 对应 GPIO 27 (Pin 13)
+bool right_gripper_touched  # 对应 GPIO 17 (Pin 11)
