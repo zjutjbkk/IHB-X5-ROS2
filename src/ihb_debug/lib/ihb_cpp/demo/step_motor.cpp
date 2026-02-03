@@ -1,50 +1,57 @@
 #include <iostream>
-#include <string>
 #include <csignal>
-#include <cstdlib> // 用于system()函数
-#include <fstream> // 用于读取文件检查CAN状态
-
-#include <sstream>
-#include <queue>
-#include <thread>
-#include <cmath> // 包含round函数的头文件
-
-#include "muscle_joint.h"
-#include "CanDriver.hpp"
-#include "servo_motorJoint.h" // 其实头文件不该大写的，但是我懒得改了
-#include "force_sensors.h"
-#include "hall_sensors.h"
-
-#include <linux/can.h>
-#include <linux/can/raw.h>
-
-#include <sys/socket.h>
-#include <vector>
-#include <chrono>
-#include <iomanip>
-#include "MiniPID.h"
-
+#include <cstdio>
+#include <cstdlib>
+#include <unistd.h>
+#include <termios.h>
 
 #include "stepper_motor_joint.h"
-#include <cstdio>
-#include <unistd.h>
-#include <csignal>
-#include <cstdlib>
 
 // 全局电机对象，用于信号处理
 static ihb::StepperMotorJoint* g_motor = nullptr;
 
-// 信号处理函数
+// ======== 终端按键读取（无需回车，非阻塞轮询）========
+static struct termios g_old_term;
+
+void enableRawMode() {
+    tcgetattr(STDIN_FILENO, &g_old_term);
+    struct termios raw = g_old_term;
+
+    // 关闭规范模式（ICANON）+ 关闭回显（ECHO）
+    raw.c_lflag &= ~(ICANON | ECHO);
+
+    // 非阻塞读取：没有按键时 read() 在短超时后返回 0
+    raw.c_cc[VMIN]  = 0;
+    raw.c_cc[VTIME] = 1;   // 0.1s（单位是 0.1 秒）
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+}
+
+void disableRawMode() {
+    tcsetattr(STDIN_FILENO, TCSANOW, &g_old_term);
+}
+
+char readKey() {
+    char c = 0;
+    ssize_t n = read(STDIN_FILENO, &c, 1);
+    if (n <= 0) return 0;
+    return c;
+}
+
+// ======== 信号处理函数 ========
 void signalHandler(int signum) {
     printf("\n捕获到信号 %d，程序即将退出...\n", signum);
-    
-    // 如果电机对象存在，执行清理（会自动归零）
+
+    // 恢复终端
+    disableRawMode();
+
+    // 如果电机对象存在，执行清理（析构会自动归零）
     if (g_motor != nullptr) {
-        printf("正在归零步进电机...\n");
+        printf("正在释放电机资源（将自动归零）...\n");
         delete g_motor;
         g_motor = nullptr;
     }
-    
+
     exit(signum);
 }
 
@@ -53,84 +60,110 @@ int main() {
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
 
-    printf("=== 步进电机高度控制示例程序 ===\n");
-    printf("使用线程安全的新接口\n");
-    printf("按 Ctrl+C 可随时安全退出并自动归零\n");
-    printf("================================\n");
+    printf("=== 步进电机高度控制（W/S/R/Q）===\n");
+    printf("w: 上移 5mm\n");
+    printf("s: 下移 5mm\n");
+    printf("r: 重置当前位置为零点（若运动中则等待停止后执行）\n");
+    printf("q: 退出（自动归零）\n");
+    printf("===================================\n");
 
     try {
-        // 创建步进电机对象 (使用线程安全的新接口)
+        // 创建步进电机对象
         g_motor = new ihb::StepperMotorJoint();
 
-        // 打印初始状态
         printf("✅ 步进电机初始化成功\n");
         printf("📍 初始高度: %d mm\n", g_motor->getHeight());
-        printf("🔄 电机状态: %s\n", g_motor->isMoving() ? "运动中" : "静止");
+        printf("🔄 重置零点位置\n");
+        g_motor->resetZero();
+        printf("📍 当前高度: %d mm\n", g_motor->getHeight());
 
-        // 等待用户输入继续
-        printf("\n按Enter开始测试...");
-        getchar();
     } catch (const std::exception& e) {
         printf("❌ 步进电机初始化失败: %s\n", e.what());
         return -1;
     }
-    
-    // 重置当前位置为零点
-    printf("🔄 重置零点位置\n");
-    g_motor->resetZero();
 
-    // 移动到-10mm高度，速度为1000脉冲/秒
-    printf("📍 移动到高度 -10 mm (速度: 1000 脉冲/秒)...\n");
-    g_motor->moveToHeight(-25, 10000);
+    // 启用“无回车读按键（非阻塞）”
+    enableRawMode();
 
-    // 等待运动完成
-    printf("⏳ 等待运动完成...\n");
-    while (g_motor->isMoving()) {
-        printf("   当前高度: %d mm, 状态: 运动中\n", g_motor->getHeight());
-        sleep(1);
+    const int step_mm = 5;
+    const int speed_pulse = 10000;
+
+    bool last_moving = g_motor->isMoving();
+    bool pending_reset_zero = false;  // r按下后，若运动中则挂起等待停止再执行
+
+    printf("\n进入按键控制：w上移5mm, s下移5mm, r重置零点, q退出\n");
+
+    while (true) {
+        // 监控运动状态变化：开始/结束只提示一次
+        bool moving = g_motor->isMoving();
+
+        // 从“运动中 -> 静止”：打印一次“完成”
+        if (last_moving && !moving) {
+            printf("✅ 运动完成！当前高度: %d mm\n", g_motor->getHeight());
+
+            // 若有挂起的零点重置请求，则在停止后执行
+            if (pending_reset_zero) {
+                printf("🔄 执行挂起操作：重置当前位置为零点...\n");
+                g_motor->resetZero();
+                printf("✅ 已重置零点，当前高度: %d mm\n", g_motor->getHeight());
+                pending_reset_zero = false;
+            }
+        }
+
+        last_moving = moving;
+
+        // 读取按键（非阻塞）
+        char key = readKey();
+        if (key == 0) {
+            // 没按键就继续循环，让程序可以及时检测“运动结束”
+            continue;
+        }
+
+        if (key == 'q' || key == 'Q') {
+            printf("收到退出指令 q，准备结束...\n");
+            break;
+        }
+
+        if (key == 'w' || key == 'W') {
+            if (g_motor->isMoving()) {
+                printf("⚠️ 电机运动中，忽略本次 w 指令\n");
+                continue;
+            }
+            printf("⬆️ 开始上移 %d mm...\n", step_mm);
+
+            // 注意：按你原先习惯，上移用负号；若实际方向反了，把 +/- 对调即可
+            g_motor->moveRelative(-step_mm, speed_pulse);
+
+        } else if (key == 's' || key == 'S') {
+            if (g_motor->isMoving()) {
+                printf("⚠️ 电机运动中，忽略本次 s 指令\n");
+                continue;
+            }
+            printf("⬇️ 开始下移 %d mm...\n", step_mm);
+            g_motor->moveRelative(+step_mm, speed_pulse);
+
+        } else if (key == 'r' || key == 'R') {
+            if (g_motor->isMoving()) {
+                pending_reset_zero = true;
+                printf("🕒 已收到 r：电机停止后将自动重置零点\n");
+                continue;
+            }
+            printf("🔄 重置当前位置为零点...\n");
+            g_motor->resetZero();
+            printf("✅ 已重置零点，当前高度: %d mm\n", g_motor->getHeight());
+
+        } else {
+            printf("(忽略按键: %c)\n", key);
+        }
     }
 
-    // 获取当前高度
-    printf("✅ 运动完成! 当前高度: %d mm\n", g_motor->getHeight());
-    
-    // 等待用户输入继续
-    printf("按Enter继续...");
-    getchar();
-    
-    // 相对移动，上升5mm
-    printf("相对移动 -5 mm...\n");
-    g_motor->moveRelative(-5, 10000);
-    
-    // 等待一段时间
-    printf("等待3秒...\n");
-    sleep(3);
-    
-    // 获取当前高度
-    printf("当前高度: %d mm\n", g_motor->getHeight());
-    
-    // 等待用户输入继续
-    printf("按Enter继续...");
-    getchar();
-    
-    // 相对移动，下降10mm
-    printf("相对移动 10 mm...\n");
-    g_motor->moveRelative(10, 10000);
-    
-    // 等待一段时间
-    printf("等待3秒...\n");
-    sleep(3);
-    
-    // 获取当前高度
-    printf("当前高度: %d mm\n", g_motor->getHeight());
-    
-    // 等待用户输入继续
-    printf("按Enter继续...");
-    getchar();
-    
+    // 恢复终端
+    disableRawMode();
+
     // 程序结束，清理资源（析构函数会自动归零）
     printf("程序结束，释放资源，电机将自动归零...\n");
     delete g_motor;
     g_motor = nullptr;
-    
+
     return 0;
-} 
+}
