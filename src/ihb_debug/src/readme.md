@@ -1,4 +1,4 @@
-##步进电机控制原理
+# 步进电机控制原理
 1.步进电机通过pwm控制，通过DM860H将控制板信号放大，拨码开关设置的脉冲数一万”，即 10000 脉冲/转，“脉冲数一万” = 每转需要 10000 个脉冲才能让电机完整旋转一圈。标准 1.8° 步距角 的两相步进电机，每个脉冲对应的角度 = 360° ÷ 10000 = 0.036°，发送 10000 个脉冲 → 电机刚好转一圈（360°），就是pwm的频率 1s 10000hz  
 转速100 RPM  每秒转数 = 100 ÷ 60 ≈ 1.67 转/秒 所需脉冲频率 = 1.67 × 10000 = 16,700 Hz（约 16.7kHz）
 
@@ -36,3 +36,14 @@ std::this_thread::sleep_for(std::chrono::milliseconds(run_time_ms));
 传入-5mm,即向上移动5mm
 订阅节点关闭后会自动订阅析构函数回到零点
 
+底层步进电机库已经修改成移动是小数形式，
+## 测试步进电机
+
+底层·移动到零点位置的测试步骤（一次移动0.5mm）
+cd /root/stepmotor/IHB-X5-ROS2/src/ihb_debug/lib/ihb_cpp/scripts
+./angle.sh
+cd /root/stepmotor/IHB-X5-ROS2/src/ihb_debug/lib/ihb_cpp/build-angle
+./step_motor 
+
+发布虚拟目标话题 ros2 run ihb_debug step_motor_publisher
+订阅虚拟目标并移动 ros2 run ihb_debug step_motor_subscriber

@@ -6,12 +6,13 @@
 #include <condition_variable>
 #include <atomic>
 #include <csignal>
+#include <string>
 
 #include "rclcpp/rclcpp.hpp"
 #include "ihb_msgs/msg/stepper_motor_joint_target.hpp"
 #include "ihb_msgs/msg/stepper_motor_joint_status.hpp"
 
-// 按你要求：相对路径 include 底层头文件
+// 按你要求：相对路径 include 底层头文件（最新版支持 double + getHeightPrecise）
 #include "../lib/ihb_cpp/ihb_cpp/include/stepper_motor_joint.h"
 
 // ----------------- 自己接管 Ctrl+C -----------------
@@ -56,10 +57,11 @@ public:
     startup_delay_ms_ = this->get_parameter("startup_delay_ms").as_int();
     if (startup_delay_ms_ < 0) startup_delay_ms_ = 0;
 
-    // 到位判定参数（正常运动）
-    this->declare_parameter<int>("arrive_tolerance_mm", 1);   // 允许误差（mm）
-    arrive_tolerance_mm_ = this->get_parameter("arrive_tolerance_mm").as_int();
-    if (arrive_tolerance_mm_ < 0) arrive_tolerance_mm_ = 0;
+    // ✅ 到位判定参数（小数版）
+    // 允许误差（mm）——用 double 更适合小数运动
+    this->declare_parameter<double>("arrive_tolerance_mm", 0.2); // 默认 0.2mm
+    arrive_tolerance_mm_ = this->get_parameter("arrive_tolerance_mm").as_double();
+    if (arrive_tolerance_mm_ < 0.0) arrive_tolerance_mm_ = 0.0;
 
     this->declare_parameter<int>("poll_ms", 20);              // 轮询周期（ms）
     poll_ms_ = this->get_parameter("poll_ms").as_int();
@@ -104,7 +106,6 @@ public:
 
   ~StepMotorSubscriber() override
   {
-    // 析构里不 publish（这时可能已经 shutdown 了），只停线程
     stop_worker_();
   }
 
@@ -115,12 +116,12 @@ public:
     stop_worker_();
 
     try {
-      RCLCPP_INFO(this->get_logger(), "Shutdown: homing to zero (moveToHeight(0)) ...");
+      RCLCPP_INFO(this->get_logger(), "Shutdown: homing to zero (moveToHeight(0.0)) ...");
 
-      // 发回零命令
-      motor_.moveToHeight(0, static_cast<uint16_t>(homing_speed_pps_));
+      // 发回零命令（小数接口）
+      motor_.moveToHeight(0.0, static_cast<uint16_t>(homing_speed_pps_));
 
-      // 等待电机结束（优先用 isMoving 更准）
+      // 等待电机结束（优先用 isMoving）
       const auto t0 = std::chrono::steady_clock::now();
       while (rclcpp::ok()) {
         if (!motor_.isMoving()) break;
@@ -138,12 +139,12 @@ public:
         std::this_thread::sleep_for(std::chrono::milliseconds(poll_ms_));
       }
 
-      // 发布回零状态（这里直接发0；也可以发 motor_.getHeight()）
+      // 发布回零状态（发布 0.0）
       publish_status(joint_id_, 0.0f);
 
       RCLCPP_INFO(this->get_logger(), "Shutdown: published zero status.");
 
-      // 给 DDS 一点时间把消息发出去（很重要）
+      // 给 DDS 一点时间把消息发出去
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     } catch (const std::exception& e) {
@@ -154,7 +155,6 @@ public:
 private:
   void stop_worker_()
   {
-    // 幂等：多次调用也安全
     running_.store(false);
     cv_.notify_all();
     if (worker_.joinable()) worker_.join();
@@ -180,10 +180,10 @@ private:
       RCLCPP_INFO(this->get_logger(), "Reset zero on start...");
       motor_.resetZero();
 
-      const int cur = motor_.getHeight();
-      RCLCPP_INFO(this->get_logger(), "Startup reset complete. current height=%d mm", cur);
+      const double cur = motor_.getHeightPrecise();
+      RCLCPP_INFO(this->get_logger(), "Startup reset complete. current height=%.3f mm", cur);
 
-      // 可选：启动也发一次状态
+      // 启动也发一次状态（保留小数）
       publish_status(joint_id_, static_cast<float>(cur));
     } catch (const std::exception &e) {
       RCLCPP_ERROR(this->get_logger(), "Startup reset failed: %s", e.what());
@@ -200,16 +200,19 @@ private:
       return;
     }
 
-    // float32(mm) -> int16(mm) 四舍五入
-    const int16_t target_mm =
-      static_cast<int16_t>(std::lround(static_cast<double>(msg->height)));
+    // ✅ 直接使用 float32(mm) -> double(mm)，不再转 int16
+    const double target_mm = static_cast<double>(msg->height);
 
-    // 忽略重复目标
+    // 忽略重复目标（用 arrive_tolerance_mm_ 或非常小的 epsilon）
     if (ignore_same_target_) {
       std::lock_guard<std::mutex> lk(last_mutex_);
-      if (has_last_target_ && target_mm == last_target_mm_) {
-        RCLCPP_INFO(this->get_logger(), "Ignore same target: %d mm", target_mm);
-        return;
+      if (has_last_target_) {
+        const double diff = std::fabs(target_mm - last_target_mm_);
+        const double eps = std::max(arrive_tolerance_mm_, 1e-6);
+        if (diff <= eps) {
+          RCLCPP_INFO(this->get_logger(), "Ignore same target: %.3f mm (diff=%.6f <= %.6f)", target_mm, diff, eps);
+          return;
+        }
       }
       last_target_mm_ = target_mm;
       has_last_target_ = true;
@@ -224,14 +227,14 @@ private:
     cv_.notify_one();
 
     RCLCPP_INFO(this->get_logger(),
-                "Queued moveToHeight: id=%u target=%.3f mm -> %d mm, speed=%d pps",
-                msg->id, msg->height, target_mm, speed_pps_);
+                "Queued moveToHeight: id=%u target=%.3f mm, speed=%d pps",
+                msg->id, msg->height, speed_pps_);
   }
 
   void worker_loop()
   {
     while (running_.load()) {
-      int16_t target_mm = 0;
+      double target_mm = 0.0;
 
       {
         std::unique_lock<std::mutex> lk(cmd_mutex_);
@@ -244,20 +247,20 @@ private:
       }
 
       try {
-        // 执行运动
+        // ✅ 执行运动（小数接口）
         motor_.moveToHeight(target_mm, static_cast<uint16_t>(speed_pps_));
 
-        // 用 getHeight 误差轮询判断到位（保留你原逻辑）
+        // ✅ 用 getHeightPrecise 小数轮询判断到位
         const auto t0 = std::chrono::steady_clock::now();
 
         while (running_.load()) {
-          const int cur = motor_.getHeight();
-          const int err = std::abs(cur - static_cast<int>(target_mm));
+          const double cur = motor_.getHeightPrecise();
+          const double err = std::fabs(cur - target_mm);
 
           if (err <= arrive_tolerance_mm_) {
             publish_status(joint_id_, static_cast<float>(cur));
             RCLCPP_INFO(this->get_logger(),
-                        "Arrived. target=%d mm, current=%d mm (tol=%d). Published status.",
+                        "Arrived. target=%.3f mm, current=%.3f mm (tol=%.3f). Published status.",
                         target_mm, cur, arrive_tolerance_mm_);
             break;
           }
@@ -268,7 +271,7 @@ private:
             if (dt >= arrive_timeout_ms_) {
               publish_status(joint_id_, static_cast<float>(cur));
               RCLCPP_WARN(this->get_logger(),
-                          "Arrive timeout. target=%d mm, current=%d mm (err=%d). Published status anyway.",
+                          "Arrive timeout. target=%.3f mm, current=%.3f mm (err=%.3f). Published status anyway.",
                           target_mm, cur, err);
               break;
             }
@@ -287,7 +290,7 @@ private:
   {
     ihb_msgs::msg::StepperMotorJointStatus st;
     st.id = id;
-    st.height = height_mm;
+    st.height = height_mm;  // float32，保留小数
     status_pub_->publish(st);
   }
 
@@ -305,7 +308,8 @@ private:
   bool stop_on_start_{true};
   int startup_delay_ms_{200};
 
-  int arrive_tolerance_mm_{1};
+  // ✅ 小数容差
+  double arrive_tolerance_mm_{0.2};
   int poll_ms_{20};
   int arrive_timeout_ms_{8000};
 
@@ -313,9 +317,10 @@ private:
   int homing_speed_pps_{10000};
   int shutdown_timeout_ms_{20000};
 
+  // ✅ last target（小数）
   std::mutex last_mutex_;
   bool has_last_target_{false};
-  int16_t last_target_mm_{0};
+  double last_target_mm_{0.0};
 
   ihb::StepperMotorJoint motor_;
 
@@ -323,7 +328,7 @@ private:
   std::mutex cmd_mutex_;
   std::condition_variable cv_;
   bool has_pending_cmd_{false};
-  int16_t pending_target_mm_{0};
+  double pending_target_mm_{0.0};
 
   std::atomic<bool> running_{false};
   std::thread worker_;

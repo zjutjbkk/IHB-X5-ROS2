@@ -1,4 +1,5 @@
 #include "stepper_motor_joint.h"
+
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -11,13 +12,39 @@
 
 namespace ihb
 {
+    // === 匿名命名空间：写 sysfs 辅助 ===
+    namespace
+    {
+        void write_pwm_sysfs(const std::string& path, const std::string& value)
+        {
+            int fd = open(path.c_str(), O_WRONLY);
+            if (fd < 0)
+            {
+                // 某些情况下 export/unexport 会返回 busy
+                if (errno == EBUSY) return;
+                throw std::runtime_error("PWM sysfs error: Cannot open " + path + " (" + std::string(strerror(errno)) + ")");
+            }
+
+            ssize_t rc = write(fd, value.c_str(), value.length());
+            if (rc < 0)
+            {
+                close(fd);
+                if (errno == EBUSY) return;
+                throw std::runtime_error("PWM sysfs error: Cannot write to " + path + " (" + std::string(strerror(errno)) + ")");
+            }
+            close(fd);
+        }
+
+        inline int clamp_int(int v, int lo, int hi)
+        {
+            if (v < lo) return lo;
+            if (v > hi) return hi;
+            return v;
+        }
+    }
+
     // === 构造与析构 ===
     StepperMotorJoint::StepperMotorJoint()
-        : height_(0),
-          current_speed_(DEFAULT_SPEED),
-          brake_enabled_(false),
-          moving_(false),
-          thread_running_(false)
     {
         initHardware();
     }
@@ -26,15 +53,18 @@ namespace ihb
     {
         try
         {
+            // 安全停止（会 join 线程）
             stopMotor();
 
-            int16_t current_height = height_.load();
-            if (current_height != 0)
+            // 析构时尽量归零（仍然用 steps 作为权威）
+            int64_t cur_steps = current_steps_.load();
+            if (cur_steps != 0)
             {
                 std::cout << "步进电机析构中，正在归零..." << std::endl;
-                int32_t steps_to_zero = std::abs(heightToSteps(current_height));
-                uint16_t homing_speed = 1000;
-                bool dir_to_zero = (current_height > 0) ? false : true;
+
+                int64_t steps_to_zero = std::llabs(cur_steps);
+                uint32_t homing_speed = 1000; // 可按需要调整
+                bool dir_to_zero = (cur_steps > 0) ? false : true; // 正方向为“增高”，回零要反向
 
                 {
                     std::lock_guard<std::mutex> hw_lock(hardware_mutex_);
@@ -42,22 +72,39 @@ namespace ihb
 
                     if (homing_speed > 0 && steps_to_zero > 0)
                     {
-                        int period_ns = 1000000000 / homing_speed;
-                        pwm_set_period(period_ns);
-                        pwm_set_duty_cycle(period_ns / 2);
-                        pwm_enable(true);
+                        // period_ns = 1e9 / speed
+                        int period_ns = static_cast<int>(1000000000LL / static_cast<long long>(homing_speed));
+                        period_ns = clamp_int(period_ns, 50, 1000000000); // 简单保护
 
-                        int run_time_ms = (steps_to_zero * 1000) / homing_speed;
-                        std::this_thread::sleep_for(std::chrono::milliseconds(run_time_ms + 50));
+                        pwm_enable(false);
+                        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+                        pwm_set_period(period_ns);
+                        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                        pwm_set_duty_cycle(period_ns / 2);
+                        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                        pwm_enable(true);
                     }
                 }
+
+                // 等待运动时间（这里在析构里，直接粗略等待即可）
+                int64_t run_time_ms = (steps_to_zero * 1000LL) / static_cast<long long>(homing_speed);
+                std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(run_time_ms + 50)));
+
+                {
+                    std::lock_guard<std::mutex> hw_lock(hardware_mutex_);
+                    pwm_enable(false);
+                }
+
+                current_steps_.store(0);
                 std::cout << "步进电机归零完成。" << std::endl;
             }
         }
-        catch (const std::exception &e)
+        catch (const std::exception& e)
         {
             std::cerr << "析构函数中发生错误: " << e.what() << std::endl;
         }
+
         cleanupHardware();
     }
 
@@ -67,16 +114,15 @@ namespace ihb
         try
         {
             gpio_chip_ = gpiod::chip(DIR_GPIO_CHIP, gpiod::chip::OPEN_BY_NAME);
-            if (!gpio_chip_)
-            {
-                throw std::runtime_error("无法打开 GPIO chip: " + std::string(DIR_GPIO_CHIP));
-            }
             dir_pin_line_ = gpio_chip_.get_line(DIR_GPIO_LINE);
-            dir_pin_line_.request({"stepper_dir", gpiod::line_request::DIRECTION_OUTPUT, 0}, 0);
+            dir_pin_line_.request({ "stepper_dir", gpiod::line_request::DIRECTION_OUTPUT, 0 }, 0);
 
             pwm_export();
+
+            // 默认确保 PWM 关闭
+            pwm_enable(false);
         }
-        catch (const std::exception &e)
+        catch (const std::exception& e)
         {
             throw std::runtime_error("硬件初始化失败: " + std::string(e.what()));
         }
@@ -84,38 +130,116 @@ namespace ihb
 
     void StepperMotorJoint::cleanupHardware()
     {
-        pwm_enable(false);
-        pwm_unexport();
+        try
+        {
+            pwm_enable(false);
+        }
+        catch (...) {}
+
+        try
+        {
+            pwm_unexport();
+        }
+        catch (...) {}
+
         std::cout << "硬件资源已清理。" << std::endl;
     }
 
-    // === 核心运动逻辑 ===
-    void StepperMotorJoint::moveToHeight(int16_t targetHeight, uint16_t speed)
+    // === steps <-> mm ===
+    double StepperMotorJoint::stepsToHeight(int64_t steps) const
     {
-        if (speed == 0)
-            return;
+        return static_cast<double>(steps) / STEPS_PER_MM;
+    }
 
-        int16_t current_height = height_.load();
-        int32_t stepsToMove = heightToSteps(targetHeight) - heightToSteps(current_height);
-        if (stepsToMove == 0)
-            return;
+    int64_t StepperMotorJoint::heightToSteps(double height_mm) const
+    {
+        // 四舍五入到最接近的整数 steps
+        return static_cast<int64_t>(std::llround(height_mm * STEPS_PER_MM));
+    }
 
+    // === 公有API实现（高度读取）===
+    int16_t StepperMotorJoint::getHeight() const
+    {
+        // 兼容旧接口：返回整数mm（四舍五入）
+        double h = getHeightPrecise();
+        double r = std::round(h);
+        if (r > static_cast<double>(INT16_MAX)) r = static_cast<double>(INT16_MAX);
+        if (r < static_cast<double>(INT16_MIN)) r = static_cast<double>(INT16_MIN);
+        return static_cast<int16_t>(r);
+    }
+
+    double StepperMotorJoint::getHeightPrecise() const
+    {
+        return stepsToHeight(current_steps_.load());
+    }
+
+    // === 兼容旧接口：整数 mm ===
+    void StepperMotorJoint::setHeight(int16_t targetHeight_mm)
+    {
+        setHeight(static_cast<double>(targetHeight_mm));
+    }
+
+    void StepperMotorJoint::moveToHeight(int16_t targetHeight_mm, uint32_t speed)
+    {
+        moveToHeight(static_cast<double>(targetHeight_mm), speed);
+    }
+
+    void StepperMotorJoint::moveRelative(int16_t distance_mm, uint32_t speed)
+    {
+        moveRelative(static_cast<double>(distance_mm), speed);
+    }
+
+    // === 新接口：double mm ===
+    void StepperMotorJoint::setHeight(double targetHeight_mm)
+    {
+        moveToHeight(targetHeight_mm, current_speed_.load());
+    }
+
+    void StepperMotorJoint::moveRelative(double distance_mm, uint32_t speed)
+    {
+        double cur_h = getHeightPrecise();
+        moveToHeight(cur_h + distance_mm, speed);
+    }
+
+    void StepperMotorJoint::moveToHeight(double targetHeight_mm, uint32_t speed)
+    {
+        if (speed == 0) return;
+
+        // 先把目标换算成 steps（整数）
+        int64_t start_steps = current_steps_.load();
+        int64_t target_steps = heightToSteps(targetHeight_mm);
+        int64_t delta = target_steps - start_steps;
+
+        if (delta == 0) return;
+
+        // 停止上一段运动（join）
         stopMotor();
 
-        bool moveDirection = (stepsToMove > 0);
+        bool moveDirection = (delta > 0);
+        int64_t stepsToMove = std::llabs(delta);
+
         current_speed_.store(speed);
 
         {
             std::lock_guard<std::mutex> lock(motor_mutex_);
             thread_running_.store(true);
             moving_.store(true);
-            height_.store(targetHeight);
 
-            std::thread(&StepperMotorJoint::motor_thread_loop, this, std::abs(stepsToMove), speed, moveDirection).detach();
+            // 启动线程（不 detach，保证析构安全）
+            motor_thread_ = std::thread(&StepperMotorJoint::motor_thread_loop,
+                                       this,
+                                       stepsToMove,
+                                       speed,
+                                       moveDirection,
+                                       target_steps);
         }
     }
 
-    void StepperMotorJoint::motor_thread_loop(int32_t steps, uint16_t speed, bool move_direction)
+    // === 线程运动逻辑 ===
+    void StepperMotorJoint::motor_thread_loop(int64_t steps,
+                                              uint32_t speed,
+                                              bool move_direction,
+                                              int64_t final_target_steps)
     {
         try
         {
@@ -123,34 +247,53 @@ namespace ihb
                 std::lock_guard<std::mutex> hw_lock(hardware_mutex_);
                 dir_pin_line_.set_value(move_direction ? 1 : 0);
 
-                // 确保PWM被禁用
+                // 先禁用 PWM，避免 period/duty 写入冲突
                 pwm_enable(false);
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
 
-                // 先设置period，再设置duty_cycle
-                int period_ns = 1000000000 / speed;
+                // 设置 period / duty
+                int period_ns = static_cast<int>(1000000000LL / static_cast<long long>(speed));
+                period_ns = clamp_int(period_ns, 50, 1000000000);
+
                 pwm_set_period(period_ns);
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+
                 pwm_set_duty_cycle(period_ns / 2);
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                
-                // 最后启用PWM
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+
+                // 最后启用
                 pwm_enable(true);
             }
 
-            int run_time_ms = (steps * 1000) / speed;
-            std::this_thread::sleep_for(std::chrono::milliseconds(run_time_ms));
+            // 预计运行时间（ms）
+            // 时间 = steps / speed (s) => ms = steps*1000/speed
+            long long total_ms = (steps * 1000LL) / static_cast<long long>(speed);
+            if (total_ms < 0) total_ms = 0;
+
+            // 分片 sleep：允许 stopMotor 更快生效
+            auto end_time = std::chrono::steady_clock::now() + std::chrono::milliseconds(total_ms);
+            while (thread_running_.load() && std::chrono::steady_clock::now() < end_time)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
         }
-        catch (const std::exception &e)
+        catch (const std::exception& e)
         {
             std::cerr << "电机线程中发生错误: " << e.what() << std::endl;
         }
 
-        if (thread_running_.load())
+        // 关闭 PWM
+        try
         {
             std::lock_guard<std::mutex> hw_lock(hardware_mutex_);
             pwm_enable(false);
+        }
+        catch (...) {}
+
+        // 如果是正常结束（没被 stop），更新最终位置
+        if (thread_running_.load())
+        {
+            current_steps_.store(final_target_steps);
         }
 
         moving_.store(false);
@@ -159,118 +302,102 @@ namespace ihb
 
     void StepperMotorJoint::stopMotor()
     {
-        if (thread_running_.exchange(false))
+        // 通知线程停止
+        thread_running_.store(false);
+
+        // join 线程，防止 detach 导致析构后仍访问 this
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
-            try
+            std::lock_guard<std::mutex> lock(motor_mutex_);
+            if (motor_thread_.joinable())
             {
-                std::lock_guard<std::mutex> hw_lock(hardware_mutex_);
-                pwm_enable(false);
-            }
-            catch (...)
-            { /* 忽略停止时的错误 */
+                motor_thread_.join();
             }
         }
+
+        // 最终确保 PWM 关闭
+        try
+        {
+            std::lock_guard<std::mutex> hw_lock(hardware_mutex_);
+            pwm_enable(false);
+        }
+        catch (...) {}
+
         moving_.store(false);
     }
 
-    // === 公有API实现 ===
-    int16_t StepperMotorJoint::getHeight() const { return height_.load(); }
-    void StepperMotorJoint::setHeight(int16_t targetHeight) { moveToHeight(targetHeight, current_speed_.load()); }
-    void StepperMotorJoint::moveRelative(int16_t distance, uint16_t speed) { moveToHeight(height_.load() + distance, speed); }
-    void StepperMotorJoint::setSpeed(uint16_t pulses_per_second) { current_speed_.store(pulses_per_second); }
-    void StepperMotorJoint::resetZero() { height_.store(0); }
-    bool StepperMotorJoint::isMoving() const { return moving_.load(); }
+    void StepperMotorJoint::resetZero()
+    {
+        // 逻辑零点：直接把当前位置 steps 置 0
+        current_steps_.store(0);
+    }
+
+    bool StepperMotorJoint::isMoving() const
+    {
+        return moving_.load();
+    }
+
     bool StepperMotorJoint::setBrake(bool brake)
     {
         brake_enabled_.store(brake);
         return brake_enabled_.load();
     }
-    int16_t StepperMotorJoint::stepsToHeight(int32_t steps) const { return static_cast<int16_t>(steps / STEPS_PER_MM); }
-    int32_t StepperMotorJoint::heightToSteps(int16_t height_mm) const { return static_cast<int32_t>(height_mm * STEPS_PER_MM); }
 
-    // === 私有PWM实现 ===
-    namespace
-    { // 使用匿名命名空间来定义辅助函数，限制其作用域在此文件内
-        void write_pwm_sysfs(const std::string &path, const std::string &value)
-        {
-            int fd = open(path.c_str(), O_WRONLY);
-            if (fd < 0)
-            {
-                if (errno == EBUSY)
-                    return;
-                throw std::runtime_error("PWM sysfs error: Cannot open " + path + " (" + strerror(errno) + ")");
-            }
-            if (write(fd, value.c_str(), value.length()) < 0)
-            {
-                close(fd);
-                if (errno == EBUSY)
-                    return;
-                throw std::runtime_error("PWM sysfs error: Cannot write to " + path);
-            }
-            close(fd);
-        }
+    void StepperMotorJoint::setSpeed(uint32_t pulses_per_second)
+    {
+        current_speed_.store(pulses_per_second);
     }
 
+    // === PWM sysfs 实现 ===
     void StepperMotorJoint::pwm_export() const
     {
         std::string path = "/sys/class/pwm/pwmchip" + std::to_string(PWM_CHIP_NUM) + "/export";
-        try
-        {
-            write_pwm_sysfs(path, std::to_string(PWM_CHANNEL));
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-        catch (const std::runtime_error &e)
-        {
-            if (std::string(e.what()).find("busy") == std::string::npos)
-                throw;
-        }
+        write_pwm_sysfs(path, std::to_string(PWM_CHANNEL));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
     void StepperMotorJoint::pwm_unexport() const
     {
         std::string path = "/sys/class/pwm/pwmchip" + std::to_string(PWM_CHIP_NUM) + "/unexport";
-        try
-        {
-            write_pwm_sysfs(path, std::to_string(PWM_CHANNEL));
-        }
-        catch (...)
-        {
-        }
+        write_pwm_sysfs(path, std::to_string(PWM_CHANNEL));
     }
 
     void StepperMotorJoint::pwm_set_period(int period_ns) const
     {
-        if (period_ns <= 0) {
+        if (period_ns <= 0)
+        {
             throw std::runtime_error("无效的PWM周期值: " + std::to_string(period_ns));
         }
 
-        // 先禁用PWM
-        std::string enable_path = "/sys/class/pwm/pwmchip" + std::to_string(PWM_CHIP_NUM) + "/pwm" + std::to_string(PWM_CHANNEL) + "/enable";
+        // 建议：写 period 前先 disable + duty=0（你原来的做法保留）
+        std::string enable_path = "/sys/class/pwm/pwmchip" + std::to_string(PWM_CHIP_NUM)
+                                + "/pwm" + std::to_string(PWM_CHANNEL) + "/enable";
         write_pwm_sysfs(enable_path, "0");
-        
-        // 设置duty_cycle为0
-        std::string duty_path = "/sys/class/pwm/pwmchip" + std::to_string(PWM_CHIP_NUM) + "/pwm" + std::to_string(PWM_CHANNEL) + "/duty_cycle";
+
+        std::string duty_path = "/sys/class/pwm/pwmchip" + std::to_string(PWM_CHIP_NUM)
+                              + "/pwm" + std::to_string(PWM_CHANNEL) + "/duty_cycle";
         write_pwm_sysfs(duty_path, "0");
-        
-        // 设置新的period
-        std::string period_path = "/sys/class/pwm/pwmchip" + std::to_string(PWM_CHIP_NUM) + "/pwm" + std::to_string(PWM_CHANNEL) + "/period";
+
+        std::string period_path = "/sys/class/pwm/pwmchip" + std::to_string(PWM_CHIP_NUM)
+                                + "/pwm" + std::to_string(PWM_CHANNEL) + "/period";
         write_pwm_sysfs(period_path, std::to_string(period_ns));
     }
 
     void StepperMotorJoint::pwm_set_duty_cycle(int duty_cycle_ns) const
     {
-        if (duty_cycle_ns < 0) {
+        if (duty_cycle_ns < 0)
+        {
             throw std::runtime_error("无效的PWM占空比值: " + std::to_string(duty_cycle_ns));
         }
 
-        std::string path = "/sys/class/pwm/pwmchip" + std::to_string(PWM_CHIP_NUM) + "/pwm" + std::to_string(PWM_CHANNEL) + "/duty_cycle";
+        std::string path = "/sys/class/pwm/pwmchip" + std::to_string(PWM_CHIP_NUM)
+                         + "/pwm" + std::to_string(PWM_CHANNEL) + "/duty_cycle";
         write_pwm_sysfs(path, std::to_string(duty_cycle_ns));
     }
 
     void StepperMotorJoint::pwm_enable(bool enable) const
     {
-        std::string path = "/sys/class/pwm/pwmchip" + std::to_string(PWM_CHIP_NUM) + "/pwm" + std::to_string(PWM_CHANNEL) + "/enable";
+        std::string path = "/sys/class/pwm/pwmchip" + std::to_string(PWM_CHIP_NUM)
+                         + "/pwm" + std::to_string(PWM_CHANNEL) + "/enable";
         write_pwm_sysfs(path, enable ? "1" : "0");
     }
 

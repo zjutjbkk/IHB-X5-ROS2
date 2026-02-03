@@ -12,7 +12,7 @@ public:
   StepMotorPublisher()
   : Node("step_motor_publisher"),
     current_height_mm_(0.0f),
-    step_mm_(-kStepMm)  // 初始每次减 5mm
+    step_mm_(-kStepMm)  // 初始每次减 0.5mm
   {
     // 参数：joint_id（消息里的 id）
     this->declare_parameter<int>("joint_id", 0);
@@ -27,12 +27,12 @@ public:
 
     pub_ = this->create_publisher<ihb_msgs::msg::StepperMotorJointTarget>(topic_, qos);
 
-    // 5 秒一次（如需 1Hz 改为 1s）
+    // 10 秒一次（如需 1Hz 改为 1s）
     timer_ = this->create_wall_timer(10s, std::bind(&StepMotorPublisher::on_timer, this));
 
     RCLCPP_INFO(this->get_logger(),
-                "Stepper target publisher started. topic='%s', id=%u, start=%.2fmm, range=[-25,0], step=5mm",
-                topic_.c_str(), joint_id_, current_height_mm_);
+                "Stepper target publisher started. topic='%s', id=%u, start=%.2fmm, range=[%.2f,%.2f], step=%.2fmm",
+                topic_.c_str(), joint_id_, current_height_mm_, kMinMm, kMaxMm, kStepMm);
   }
 
 private:
@@ -49,13 +49,13 @@ private:
     // 2) 计算下一次目标
     float next = current_height_mm_ + step_mm_;
 
-    // 触底：到 -25 后改为上升
+    // 触底：到 -2 后改为上升
     if (next <= kMinMm) {
       next = kMinMm;
       step_mm_ = +kStepMm;
     }
 
-    // 触顶：到 0 后改为下降
+    // 触顶：到 2 后改为下降
     if (next >= kMaxMm) {
       next = kMaxMm;
       step_mm_ = -kStepMm;
@@ -65,9 +65,9 @@ private:
   }
 
 private:
-  static constexpr float kMinMm  = -25.0f;
-  static constexpr float kMaxMm  =  0.0f;
-  static constexpr float kStepMm =  5.0f;
+  static constexpr float kMinMm  = -2.0f;
+  static constexpr float kMaxMm  =  2.0f;
+  static constexpr float kStepMm =  0.5f;
 
   rclcpp::Publisher<ihb_msgs::msg::StepperMotorJointTarget>::SharedPtr pub_;
   rclcpp::TimerBase::SharedPtr timer_;
