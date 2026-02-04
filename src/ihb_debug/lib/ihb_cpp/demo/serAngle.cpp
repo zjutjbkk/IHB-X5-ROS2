@@ -41,62 +41,71 @@ void progressAngle();           // 处理角度传感器数据 - 已优化性能
 void signalHandler(int signum); // 信号处理函数
 
 // 检查CAN总线状态
-bool checkCanStatus(const std::string& interface = "can1") {
+bool checkCanStatus(const std::string &interface = "can1")
+{
     // 检查接口是否存在
     std::string path = "/sys/class/net/" + interface + "/operstate";
     std::ifstream statusFile(path);
-    if (!statusFile.is_open()) {
+    if (!statusFile.is_open())
+    {
         std::cout << "CAN接口 " << interface << " 不存在！" << std::endl;
         return false;
     }
-    
+
     // 读取接口状态
     std::string status;
     std::getline(statusFile, status);
     statusFile.close();
-    
+
     // 检查状态是否为"up"
-    if (status == "up") {
+    if (status == "up")
+    {
         std::cout << "CAN接口 " << interface << " 已经启动！" << std::endl;
         return true;
-    } else {
+    }
+    else
+    {
         std::cout << "CAN接口 " << interface << " 状态: " << status << std::endl;
         return false;
     }
 }
 
 // 初始化CAN总线
-bool initCanBus() {
+bool initCanBus()
+{
     // 首先检查CAN总线状态
-    if (checkCanStatus("can1")) {
+    if (checkCanStatus("can1"))
+    {
         std::cout << "CAN总线已经启动，无需重新初始化" << std::endl;
         return true;
     }
-    
+
     int ret = 0;
-    
+
     std::cout << "开始初始化CAN总线..." << std::endl;
-    
+
     // 设置CAN总线比特率
     ret = system("sudo ip link set can1 type can bitrate 1000000");
-    if (ret != 0) {
+    if (ret != 0)
+    {
         std::cerr << "设置CAN总线比特率失败！" << std::endl;
         return false;
     }
-    
+
     // 休眠1秒
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    
+
     // 启动CAN总线
     ret = system("sudo ip link set can1 up");
-    if (ret != 0) {
+    if (ret != 0)
+    {
         std::cerr << "启动CAN总线失败！" << std::endl;
         return false;
     }
-    
+
     // 再休眠5秒确保CAN总线完全启动
     std::this_thread::sleep_for(std::chrono::seconds(5));
-    
+
     std::cout << "CAN总线初始化成功！" << std::endl;
     return true;
 }
@@ -111,11 +120,17 @@ ihb::ServoMotorJoint ser4(4);
 
 ihb::MuscleJoint muscle1(0); // l1 - 左臂肌肉关节
 ihb::MuscleJoint muscle2(1);
-ihb::MuscleJoint muscle3(3);
-ihb::MuscleJoint muscle4(4);
+ihb::MuscleJoint muscle3(2);
+ihb::MuscleJoint muscle4(3);
+ihb::MuscleJoint muscle5(4); // r1 - 右臂肌肉关节
+ihb::MuscleJoint muscle6(5);
+ihb::MuscleJoint muscle7(6);
+ihb::MuscleJoint muscle8(7);
+ihb::MuscleJoint muscle9(8); // 暂定的末端执行器
 
 // 信号处理函数
-void signalHandler(int signum) {
+void signalHandler(int signum)
+{
     std::cout << "\n捕获到信号 " << signum << "，程序即将安全退出..." << std::endl;
     g_running = false;
 
@@ -134,6 +149,11 @@ void signalHandler(int signum) {
     muscle2.setPressure(0, 0, 0, 0);
     muscle3.setPressure(0, 0, 0, 0);
     muscle4.setPressure(0, 0, 0, 0);
+    muscle5.setPressure(0, 0, 0, 0);
+    muscle6.setPressure(0, 0, 0, 0);  
+    muscle7.setPressure(0, 0, 0, 0);
+    muscle8.setPressure(0, 0, 0, 0);
+    muscle9.setPressure(0, 0, 0, 0);
 
     exit(signum);
 }
@@ -150,7 +170,8 @@ int main(int argc, char **argv)
     std::cout << "=========================================" << std::endl;
 
     // 首先初始化CAN总线
-    if (!initCanBus()) {
+    if (!initCanBus())
+    {
         std::cerr << "❌ CAN总线初始化失败，程序将继续但可能无法通信！" << std::endl;
     }
 
@@ -163,6 +184,11 @@ int main(int argc, char **argv)
     muscle2.setPressure(0, 0, 0, 0);
     muscle3.setPressure(0, 0, 0, 0);
     muscle4.setPressure(0, 0, 0, 0);
+    muscle5.setPressure(0, 0, 0, 0);
+    muscle6.setPressure(0, 0, 0, 0);
+    muscle7.setPressure(0, 0, 0, 0);
+    muscle8.setPressure(0, 0, 0, 0);
+    muscle9.setPressure(0, 0, 0, 0);
 
     // 启动伺服电机
     std::cout << "🔄 启动伺服电机..." << std::endl;
@@ -171,11 +197,11 @@ int main(int argc, char **argv)
     ser3.start();
     ser4.start();
 
-    // 设置伺服电机初始位置
-    ser1.setPositonWithSpeedLimit(5*100, 200);
-    ser2.setPositonWithSpeedLimit(5*100, 200);
-    ser3.setPositonWithSpeedLimit(0, 120);
-    ser4.setPositonWithSpeedLimit(0, 120);
+    // // 设置伺服电机初始位置
+    // ser1.setPositonWithSpeedLimit(5*100, 200);
+    // ser2.setPositonWithSpeedLimit(5*100, 200);
+    // ser3.setPositonWithSpeedLimit(0, 120);
+    // ser4.setPositonWithSpeedLimit(0, 120);
 
     // 启动霍尔传感器 (不自动打印，手动读取)
     std::cout << "🔄 启动霍尔传感器..." << std::endl;
@@ -191,7 +217,6 @@ int main(int argc, char **argv)
 
     receiveThread.detach();
     angleThread.detach();
-    
 
     std::cout << "✅ 系统初始化完成！" << std::endl;
     std::cout << "📊 开始数据监控..." << std::endl;
@@ -210,49 +235,74 @@ int main(int argc, char **argv)
     std::cout << "按 Ctrl+C 退出" << std::endl;
 
     int loop_count = 0;
+    muscle7.setPressure(100, 0, 0, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    muscle7.setPressure(0, 100, 0, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    muscle7.setPressure(0, 0, 100, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    muscle7.setPressure(0, 0, 0, 100);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    muscle7.setPressure(0, 0, 0, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    muscle8.setPressure(100, 0, 0, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    muscle8.setPressure(0, 100, 0, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    muscle8.setPressure(0, 0, 100, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    muscle8.setPressure(0, 0, 0, 100);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    muscle9.setPressure(100, 0, 0, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    muscle9.setPressure(0, 100, 0, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    muscle9.setPressure(0, 0, 100, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    muscle9.setPressure(0, 0, 0, 100);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+
     //    muscle1.setPressure(100, 0, 0, 0);
-    //静力学输出
-     StaticsModel model;
-    //     std::array<float, 10> joint_angles = {
-    //     0.0f, 0.0f, 10.0f, 0.0f, 10.0f,
-    //     0.0f, 10.0f, 0.0f, 10.0f, 0.0f
+    // //静力学输出
+    //  StaticsModel model;
+    // //     std::array<float, 10> joint_angles = {
+    // //     0.0f, 0.0f, 10.0f, 0.0f, 10.0f,
+    // //     0.0f, 10.0f, 0.0f, 10.0f, 0.0f
+    // // };
+    //      std::array<float, 10> joint_angles = {
+    //     0.0f, 0.0f, 0.0f, 10.0f, 0.0f,
+    //     10.0f, 0.0f, 10.0f, 0.0f, 10.0f
     // };
-         std::array<float, 10> joint_angles = {
-        0.0f, 0.0f, 0.0f, 10.0f, 0.0f,
-        10.0f, 0.0f, 10.0f, 0.0f, 10.0f
-    };
-    std::array<float, 16> muscle_pressures;
-    // bool success = model.computeGimbalMusclePressures(joint_angles, muscle_pressures);
-    // muscle1.setDoublePressure(120, 0);
-    // muscle3.setDoublePressure(120, 0);
-    // muscle3.setDoublePressure(120, 0);
-    //   muscle4.setDoublePressure(98, 0);
-    muscle1.setPressure(muscle_pressures[0], muscle_pressures[1], muscle_pressures[2], muscle_pressures[3]);
-    // muscle2.setPressure(muscle_pressures[4], muscle_pressures[5], muscle_pressures[6], muscle_pressures[7]);
-    // muscle3.setPressure(muscle_pressures[8], muscle_pressures[9], muscle_pressures[10], muscle_pressures[11]);
-    // muscle4.setPressure(muscle_pressures[12], muscle_pressures[13], muscle_pressures[14], muscle_pressures[15]);
-    // muscle1.setPressure(100, 100, 0, 0);
-    // muscle2.setPressure(100, 100, 0, 0);
-    // muscle3.setPressure(100, 100, 0, 0);
-    // muscle4.setPressure(100, 100, 0, 0);
-    // muscle1.setPressure(0, 100, 100, 0);
-    // muscle2.setPressure(0, 100, 100, 0);
-    // muscle3.setPressure(0, 100, 100, 0);
-    // muscle4.setPressure(0, 100, 100, 0);
-    sleep(5);
-    muscle1.setPressure(0, 0, 0, 0);
-    muscle2.setPressure(0, 0, 0, 0);
-    muscle3.setPressure(0, 0, 0, 0);
-    muscle4.setPressure(0, 0, 0, 0);
-    ser1.setPositonWithSpeedLimit(0, 120);
+    // std::array<float, 16> muscle_pressures;
+    // // bool success = model.computeGimbalMusclePressures(joint_angles, muscle_pressures);
+    // // muscle1.setDoublePressure(120, 0);
+    // // muscle3.setDoublePressure(120, 0);
+    // // muscle3.setDoublePressure(120, 0);
+    // //   muscle4.setDoublePressure(98, 0);
+    // muscle1.setPressure(muscle_pressures[0], muscle_pressures[1], muscle_pressures[2], muscle_pressures[3]);
+    // // muscle2.setPressure(muscle_pressures[4], muscle_pressures[5], muscle_pressures[6], muscle_pressures[7]);
+    // // muscle3.setPressure(muscle_pressures[8], muscle_pressures[9], muscle_pressures[10], muscle_pressures[11]);
+    // // muscle4.setPressure(muscle_pressures[12], muscle_pressures[13], muscle_pressures[14], muscle_pressures[15]);
+    // // muscle1.setPressure(100, 100, 0, 0);
+    // // muscle2.setPressure(100, 100, 0, 0);
+    // // muscle3.setPressure(100, 100, 0, 0);
+    // // muscle4.setPressure(100, 100, 0, 0);
+    // // muscle1.setPressure(0, 100, 100, 0);
+    // // muscle2.setPressure(0, 100, 100, 0);
+    // // muscle3.setPressure(0, 100, 100, 0);
+    // // muscle4.setPressure(0, 100, 100, 0);
+    // sleep(5);
+    // muscle1.setPressure(0, 0, 0, 0);
+    // muscle2.setPressure(0, 0, 0, 0);
+    // muscle3.setPressure(0, 0, 0, 0);
+    // muscle4.setPressure(0, 0, 0, 0);
+    ser1.setPositonWithSpeedLimit(0, 10);
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    ser2.setPositonWithSpeedLimit(0, 120);
+    ser2.setPositonWithSpeedLimit(0, 10);
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    ser3.setPositonWithSpeedLimit(0, 120);
+    ser3.setPositonWithSpeedLimit(0, 10);
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    ser4.setPositonWithSpeedLimit(0, 120);
-
-
+    ser4.setPositonWithSpeedLimit(0, 10);
 
     // while(g_running) {
     //     // 使用线程安全接口读取伺服电机角度 (无需外部加锁)
@@ -309,8 +359,23 @@ int main(int argc, char **argv)
 
     // }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
- 
+    muscle1.setPressure(0, 0, 0, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    muscle2.setPressure(0, 0, 0, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    muscle3.setPressure(0, 0, 0, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    muscle4.setPressure(0, 0, 0, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    muscle5.setPressure(0, 0, 0, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    muscle6.setPressure(0, 0, 0, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    muscle7.setPressure(0, 0, 0, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    muscle8.setPressure(0, 0, 0, 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    muscle9.setPressure(0, 0, 0, 0);
     return 0;
 }
 
@@ -391,7 +456,7 @@ void receiveCanFramesExample()
         {
             // read a single message
             sockcanpp::CanMessage receivedMessage = canDriver.readMessage();
-            //can已经全收了 分id接受即可
+            // can已经全收了 分id接受即可
 
             // convert message to data
             for (int i = 0; i < receivedMessage.getFrameData().size(); i++)
@@ -402,7 +467,7 @@ void receiveCanFramesExample()
             uint16_t canId = uint16_t(receivedMessage.getCanId());
 
             // 使用线程安全接口处理CAN消息 (无需外部加锁)
-            if(canId == 0x141)
+            if (canId == 0x141)
             {
                 ser1.processCanMessage(data);
                 g_message_count++;
@@ -421,9 +486,9 @@ void receiveCanFramesExample()
             {
                 ser4.processCanMessage(data);
                 g_message_count++;
-                //0x92读取多圈角度
-                // 优化：移除频繁的调试输出
-                // std::cout << ser1.MAngle() << "," << ser2.MAngle() << std::endl;
+                // 0x92读取多圈角度
+                //  优化：移除频繁的调试输出
+                //  std::cout << ser1.MAngle() << "," << ser2.MAngle() << std::endl;
             }
             // 优化：移除不必要的调试输出
             // std::cout << "ID: " << std::hex << uint16_t(receivedMessage.getCanId()) << " DATA: ";
@@ -438,4 +503,3 @@ void receiveCanFramesExample()
 
     std::cout << "🛑 CAN接收线程已安全退出" << std::endl;
 }
-

@@ -4,7 +4,7 @@
 #include <memory>
 #include <mutex>
 // Reduction ratio 减速比
-#define Ratio 8
+#define Ratio 36
 namespace ihb
 {
 
