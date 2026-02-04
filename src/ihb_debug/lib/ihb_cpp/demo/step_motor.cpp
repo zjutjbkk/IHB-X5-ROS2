@@ -91,7 +91,7 @@ int main() {
     enableRawMode();
 
     // ✅ double，保证 0.5 不被截断
-    const double step_mm = 0.5;
+    const double step_mm = 10.0;
     const int speed_pulse = 10000;
 
     bool last_moving = g_motor->isMoving();

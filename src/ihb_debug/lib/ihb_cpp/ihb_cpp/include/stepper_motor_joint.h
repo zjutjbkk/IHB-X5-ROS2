@@ -19,7 +19,7 @@ namespace ihb
         StepperMotorJoint& operator=(const StepperMotorJoint&) = delete;
 
         // --- 公有API（兼容旧接口）---
-        // 仍返回“整数mm”（四舍五入），兼容你现在 printf("%d")
+        // 仍返回“整数mm”（四舍五入）
         int16_t getHeight() const;
 
         // 新增：返回“精确mm（double）”
@@ -71,11 +71,10 @@ namespace ihb
         static constexpr int PWM_CHIP_NUM = 0;
         static constexpr int PWM_CHANNEL = 0;
 
-        // 关键：每毫米多少步（允许非整数mm靠 steps 表达）
+        // 关键：每毫米多少步
         static constexpr double STEPS_PER_MM = 1000.0;
 
         // --- 状态与资源管理 ---
-        // 以 steps 作为内部“权威位置”，避免 double 原子问题与累计误差
         std::atomic<int64_t> current_steps_{0};
 
         std::atomic<uint32_t> current_speed_{DEFAULT_SPEED};
