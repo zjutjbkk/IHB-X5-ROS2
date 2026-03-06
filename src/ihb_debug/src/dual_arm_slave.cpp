@@ -112,21 +112,31 @@ private:
 
         // 1. 填充 8 个肌肉关节 (字段名: muscle_joint, 大小: 8)
         // 遍历 msg.muscle_joint 数组
+     // 1. 填充 8 个肌肉关节 (字段名: muscle_joint, 大小: 8)
         for (int i = 0; i < 8; i++) {
             msg.muscle_joint[i].id = i + 1;
             
             if (halls.size() >= 16) {
                 if (i < 4) {
-                    // --- 右臂 (Joint 1-4) ---
-                    // 映射: Hall [i] 和 [7-i]
-                    msg.muscle_joint[i].angle[0] = -static_cast<int16_t>(halls[i]);
-                    msg.muscle_joint[i].angle[1] = static_cast<int16_t>(halls[7-i]);
+                    // --- 左臂 Left Arm (索引 0~3) ---
+                    // 映射: 
+                    // i=0 -> halls[0] 与 halls[7]
+                    // i=1 -> halls[1] 与 halls[6]
+                    // i=2 -> halls[2] 与 halls[5]
+                    // i=3 -> halls[3] 与 halls[4]
+                    
+                    msg.muscle_joint[i].angle[0] = -(halls[7-i]);
+                    msg.muscle_joint[i].angle[1] = (halls[i]);
                 } else {
-                    // --- 左臂 (Joint 5-8) ---
-                    // 映射: Hall [8 + (i-4)] 和 [15 - (i-4)]
-                    int offset = i - 4;
-                    msg.muscle_joint[i].angle[0] = -static_cast<int16_t>(halls[8 + offset]);
-                    msg.muscle_joint[i].angle[1] = static_cast<int16_t>(halls[15 - offset]);
+                    // --- 右臂 Right Arm (索引 4~7) ---
+                    // 映射: 
+                    // i=4 (offset=0) -> halls[8] 与 halls[15]
+                    // i=5 (offset=1) -> halls[9] 与 halls[14]
+                    // i=6 (offset=2) -> halls[10] 与 halls[13]
+                    // i=7 (offset=3) -> halls[11] 与 halls[12]
+                    int offset = i - 4; // 计算 0-3 的偏移量
+                    msg.muscle_joint[i].angle[0] = -(halls[8 + offset]);
+                    msg.muscle_joint[i].angle[1] =  (halls[15 - offset]);
                 }
             } else {
                 msg.muscle_joint[i].angle[0] = 0;
@@ -218,18 +228,19 @@ private:
             if (halls.size() >= 16) {
                 std::lock_guard<std::mutex> lock(mtx_); 
                 
-                // --- 右臂 (Muscle 0-3) ---
+                // --- 左臂 Left Arm (muscle_joints_ 0~3) ---
                 for (int i = 0; i < 4; i++) {
-                    muscle_joints_[i].processAngle(-halls[i], halls[7-i]);
+                    // i 对应 halls[i] 和 halls[7-i]
+                    muscle_joints_[i].processAngle(-halls[7-i], halls[i]);
                     muscle_joints_[i].update(); 
                 }
 
-                // --- 左臂 (Muscle 4-7) ---
+                // --- 右臂 Right Arm (muscle_joints_ 4~7) ---
                 for (int i = 0; i < 4; i++) {
-                    int idx = 4 + i; // 肌肉关节索引 4,5,6,7
-                    // Hall索引: 
-                    // i=0(Muscle4) -> Hall 8, 15
-                    // i=1(Muscle5) -> Hall 9, 14
+                    int idx = 4 + i; // 肌肉关节实际索引 4,5,6,7
+                    // i 的取值是 0,1,2,3
+                    // idx=4 (i=0) -> halls[8], halls[15]
+                    // idx=5 (i=1) -> halls[9], halls[14]
                     muscle_joints_[idx].processAngle(-halls[8+i], halls[15-i]);
                     muscle_joints_[idx].update();
                 }
