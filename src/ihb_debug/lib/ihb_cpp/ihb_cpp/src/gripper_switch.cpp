@@ -53,9 +53,10 @@ bool GripperSwitch::isTriggered() {
             last_stable_state_ = current_is_pressed;
             last_change_time_ = now;
         }
-    } else {
-        last_change_time_ = now;
     }
+    //  else {
+    //     last_change_time_ = now;
+    // }
 
     return last_stable_state_;
 }
