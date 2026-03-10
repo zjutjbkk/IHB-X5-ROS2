@@ -35,6 +35,7 @@ namespace ihb
         // 防抖变量
         int debounce_ms_;
         bool last_stable_state_ = false;
+        bool last_raw_state_ = false;     // 新增：记录上一次的原始读取值
         std::chrono::steady_clock::time_point last_change_time_;
     };
 }

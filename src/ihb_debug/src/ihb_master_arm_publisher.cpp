@@ -199,24 +199,24 @@ private:
         {
             // 伺服电机 (注意这里 120 必须是整数)
             target_msg.servo_joint[0].id = 1;
-            target_msg.servo_joint[0].angle = hall_angles[2];
-            target_msg.servo_joint[0].speed_limit = 120;
+            target_msg.servo_joint[0].angle = -hall_angles[3];
+            target_msg.servo_joint[0].speed_limit = 300;
             target_msg.servo_joint[1].id = 2;
-            target_msg.servo_joint[1].angle = hall_angles[3];
-            target_msg.servo_joint[1].speed_limit = 120;
+            target_msg.servo_joint[1].angle = (-hall_angles[2] > 18.0f) ? 18.0f : -hall_angles[2];;
+            target_msg.servo_joint[1].speed_limit = 300;
             target_msg.servo_joint[2].id = 3;
-            target_msg.servo_joint[2].angle = hall_angles[10];
-            target_msg.servo_joint[2].speed_limit = 120;
+            target_msg.servo_joint[2].angle = -hall_angles[11];
+            target_msg.servo_joint[2].speed_limit = 300;
             target_msg.servo_joint[3].id = 4;
-            target_msg.servo_joint[3].angle = hall_angles[11];
-            target_msg.servo_joint[3].speed_limit = 120;
+            target_msg.servo_joint[3].angle = (-hall_angles[10] < -18.0f) ? -18.0f : -hall_angles[10];
+            target_msg.servo_joint[3].speed_limit = 300;
 
-            // 主端角度读取 (根据代码推断：[0][1]是右臂，[8][9]是左臂)
-            float R_master_a0 = hall_angles[0] / 3.0f;
-            float R_master_a1 = hall_angles[1] / 3.0f;
-            float L_master_a0 = hall_angles[8] / 3.0f;
-            float L_master_a1 = hall_angles[9] / 3.0f;
-
+            // 主端角度读取 (根据代码推断：[0][1]是左臂，[8][9]是右臂)
+            float L_master_a0 = hall_angles[0] / 3.0f;
+            float L_master_a1 =-hall_angles[1] / 3.0f;
+            float R_master_a0 = hall_angles[8] / 3.0f;
+            float R_master_a1 = hall_angles[9] / 3.0f;
+ 
             for (int i = 0; i < 8; i++)
             {
                 target_msg.muscle_joint[i].id = i + 1;
