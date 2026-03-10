@@ -150,7 +150,7 @@ void signalHandler(int signum)
     muscle3.setPressure(0, 0, 0, 0);
     muscle4.setPressure(0, 0, 0, 0);
     muscle5.setPressure(0, 0, 0, 0);
-    muscle6.setPressure(0, 0, 0, 0);  
+    muscle6.setPressure(0, 0, 0, 0);
     muscle7.setPressure(0, 0, 0, 0);
     muscle8.setPressure(0, 0, 0, 0);
     muscle9.setPressure(0, 0, 0, 0);
@@ -198,10 +198,10 @@ int main(int argc, char **argv)
     ser4.start();
 
     // // 设置伺服电机初始位置
-    // ser1.setPositonWithSpeedLimit(5*100, 200);
-    // ser2.setPositonWithSpeedLimit(5*100, 200);
-    // ser3.setPositonWithSpeedLimit(0, 120);
-    // ser4.setPositonWithSpeedLimit(0, 120);
+    ser1.setPositonWithSpeedLimit(0, 200);
+    ser2.setPositonWithSpeedLimit(0, 200);
+    ser3.setPositonWithSpeedLimit(0, 120);
+    ser4.setPositonWithSpeedLimit(0, 120);
 
     // 启动霍尔传感器 (不自动打印，手动读取)
     std::cout << "🔄 启动霍尔传感器..." << std::endl;
@@ -234,32 +234,38 @@ int main(int argc, char **argv)
     std::cout << "格式: 伺服电机角度 | 霍尔传感器角度值" << std::endl;
     std::cout << "按 Ctrl+C 退出" << std::endl;
 
-    int loop_count = 0;
-    muscle7.setPressure(100, 0, 0, 0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-    muscle7.setPressure(0, 100, 0, 0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-    muscle7.setPressure(0, 0, 100, 0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-    muscle7.setPressure(0, 0, 0, 100);
-    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-    muscle7.setPressure(0, 0, 0, 0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    muscle8.setPressure(100, 0, 0, 0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-    muscle8.setPressure(0, 100, 0, 0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-    muscle8.setPressure(0, 0, 100, 0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-    muscle8.setPressure(0, 0, 0, 100);
-    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-    muscle9.setPressure(100, 0, 0, 0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-    muscle9.setPressure(0, 100, 0, 0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-    muscle9.setPressure(0, 0, 100, 0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-    muscle9.setPressure(0, 0, 0, 100);
+    ser1.setPositonWithSpeedLimit(0, 200);
+    ser2.setPositonWithSpeedLimit(5*100, 200);
+    ser3.setPositonWithSpeedLimit(0, 120);
+    ser4.setPositonWithSpeedLimit(5*100, 120);
+    std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+ 
+    // int loop_count = 0;
+    // muscle7.setPressure(100, 0, 0, 0);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    // muscle7.setPressure(0, 100, 0, 0);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    // muscle7.setPressure(0, 0, 100, 0);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    // muscle7.setPressure(0, 0, 0, 100);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    // muscle7.setPressure(0, 0, 0, 0);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    // muscle8.setPressure(100, 0, 0, 0);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    // muscle8.setPressure(0, 100, 0, 0);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    // muscle8.setPressure(0, 0, 100, 0);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    // muscle8.setPressure(0, 0, 0, 100);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+    // muscle9.setPressure(300, 0, 0, 0);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    // muscle9.setPressure(0, 300, 0, 0);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    // muscle9.setPressure(0, 0, 300, 0);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    // muscle9.setPressure(0, 0, 0, 300);
     // std::this_thread::sleep_for(std::chrono::milliseconds(10000));
 
     //    muscle1.setPressure(100, 0, 0, 0);
@@ -296,6 +302,7 @@ int main(int argc, char **argv)
     // muscle2.setPressure(0, 0, 0, 0);
     // muscle3.setPressure(0, 0, 0, 0);
     // muscle4.setPressure(0, 0, 0, 0);
+
     ser1.setPositonWithSpeedLimit(0, 10);
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
     ser2.setPositonWithSpeedLimit(0, 10);

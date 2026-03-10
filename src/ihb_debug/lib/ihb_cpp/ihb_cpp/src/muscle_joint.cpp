@@ -256,7 +256,8 @@ namespace ihb
         unsigned char data[8];
         memset(data, 0, sizeof(data));
         // 定义气压上限，使用常量可以方便未来修改
-        const uint16_t MAX_PRESSURE_LIMIT = 280;
+        // const uint16_t MAX_PRESSURE_LIMIT = 280;
+        const uint16_t MAX_PRESSURE_LIMIT = (_id == 8) ? 500 : 280;
 
         // 使用 std::min 函数对每个气压值进行钳位操作
         // std::min(a, b) 会返回 a 和 b 中较小的值

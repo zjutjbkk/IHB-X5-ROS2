@@ -30,7 +30,7 @@ public:
     : Node("ihb_slave_dual_arm_controller"), g_running_(true), 
       ser1_(1), ser2_(2), ser3_(3), ser4_(4) 
     {
-        RCLCPP_INFO(this->get_logger(), ">>> IHB 双臂底层控制器启动 [新消息格式适配版] <<<");
+        RCLCPP_INFO(this->get_logger(), ">>> IHB 双臂底层控制器启动 [含夹爪映射版] <<<");
 
         try {
             // 1. 初始化日志
@@ -73,7 +73,9 @@ public:
         if (pid_thread_.joinable()) pid_thread_.join();
         if (log_file_.is_open()) log_file_.close(); 
 
+        // --- [修改] 安全退出时，切断所有 9 个通道的气压 (包括夹爪) ---
         for (auto & mj : muscle_joints_) mj.setPressure(0, 0, 0, 0);
+        
         hall_sensors_.stop();
         ser1_.close(); ser2_.close(); ser3_.close(); ser4_.close();
         RCLCPP_INFO(this->get_logger(), "✅ 系统安全退出。");
@@ -99,42 +101,24 @@ private:
         }
     }
 
-    // --- 状态发布回调 (适配新 IhbStatus.msg) ---
+    // --- 状态发布回调 ---
     void publish_status_callback() {
         auto msg = ihb_msgs::msg::IhbStatus();
         msg.header.stamp = this->now();
         msg.header.frame_id = "ihb_slave"; 
 
-        // 填充当前模式状态 (可选，这里默认填0或上一次接收到的命令)
-        // msg.cmd = current_cmd_; 
-
         std::vector<float> halls = hall_sensors_.getAllFilteredAngles();
 
-        // 1. 填充 8 个肌肉关节 (字段名: muscle_joint, 大小: 8)
-        // 遍历 msg.muscle_joint 数组
-     // 1. 填充 8 个肌肉关节 (字段名: muscle_joint, 大小: 8)
+        // 1. 填充 8 个肌肉关节 
         for (int i = 0; i < 8; i++) {
             msg.muscle_joint[i].id = i + 1;
             
             if (halls.size() >= 16) {
                 if (i < 4) {
-                    // --- 左臂 Left Arm (索引 0~3) ---
-                    // 映射: 
-                    // i=0 -> halls[0] 与 halls[7]
-                    // i=1 -> halls[1] 与 halls[6]
-                    // i=2 -> halls[2] 与 halls[5]
-                    // i=3 -> halls[3] 与 halls[4]
-                    
                     msg.muscle_joint[i].angle[0] = -(halls[7-i]);
                     msg.muscle_joint[i].angle[1] = (halls[i]);
                 } else {
-                    // --- 右臂 Right Arm (索引 4~7) ---
-                    // 映射: 
-                    // i=4 (offset=0) -> halls[8] 与 halls[15]
-                    // i=5 (offset=1) -> halls[9] 与 halls[14]
-                    // i=6 (offset=2) -> halls[10] 与 halls[13]
-                    // i=7 (offset=3) -> halls[11] 与 halls[12]
-                    int offset = i - 4; // 计算 0-3 的偏移量
+                    int offset = i - 4; 
                     msg.muscle_joint[i].angle[0] = -(halls[8 + offset]);
                     msg.muscle_joint[i].angle[1] =  (halls[15 - offset]);
                 }
@@ -144,7 +128,7 @@ private:
             }
         }
 
-        // 2. 填充 4 个伺服电机 (字段名: servo_joint, 大小: 4)
+        // 2. 填充 4 个伺服电机 
         float m_angles[4];
         m_angles[0] = -ser1_.MAngle();
         m_angles[1] = -ser2_.MAngle();
@@ -154,7 +138,6 @@ private:
         for(int i=0; i<4; i++) {
             msg.servo_motor[i].id = i + 1;
             msg.servo_motor[i].angle = m_angles[i];
-            // 注意：如果 IhbStatus 用的是 Target 类型，可能没有 speed/current 字段，这里只填 angle
         }
 
         publisher_->publish(msg);
@@ -168,19 +151,14 @@ private:
             
             log_file_ << (current_ms - start_time_ms_);
 
-            // 目标值
             for(int i=0; i<8; i++) {
                 log_file_ << "," << muscle_joints_[i].getTargetAngle1() 
                           << "," << muscle_joints_[i].getTargetAngle2();
             }
-            
-            // 实际值
             for(int i=0; i<8; i++) {
                 log_file_ << "," << msg.muscle_joint[i].angle[0] 
                           << "," << msg.muscle_joint[i].angle[1];
             }
-            
-            // 电机
             for(int i=0; i<4; i++) {
                 log_file_ << "," << m_angles[i];
             }
@@ -188,35 +166,86 @@ private:
         }
     }
 
-    // --- 目标回调 (适配新 IhbTarget.msg) ---
+    // --- 目标回调 ---
     void target_callback(const ihb_msgs::msg::IhbTarget::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(mtx_);
         
-        // 1. 伺服电机控制 (字段名: servo_joint, 大小: 4)
-        // 假设 ServoMotorJointTarget 包含 angle 和 speed_limit
-        // 这里的索引访问方式适配固定数组 array[4]
-        // RCLCPP_INFO(this->get_logger(), 
-        // "Received Servo Angles: [0]:%.2f, [1]:%.2f, [2]:%.2f, [3]:%.2f",
-        // msg->servo_joint[0].angle, 
-        // msg->servo_joint[1].angle, 
-        // msg->servo_joint[2].angle, 
-        // msg->servo_joint[3].angle);
+        // 1. 伺服电机控制
         ser1_.setPositonWithSpeedLimit(msg->servo_joint[0].angle*100, msg->servo_joint[0].speed_limit);
         ser2_.setPositonWithSpeedLimit(msg->servo_joint[1].angle*100, msg->servo_joint[1].speed_limit);
         ser3_.setPositonWithSpeedLimit(msg->servo_joint[2].angle*100, msg->servo_joint[2].speed_limit);
         ser4_.setPositonWithSpeedLimit(msg->servo_joint[3].angle*100, msg->servo_joint[3].speed_limit);
 
-        // 2. 肌肉关节控制 (字段名: muscle_joint, 大小: 8)
+        // 2. 肌肉关节控制 (前 8 个用于手臂 PID 控制)
         for (int i = 0; i < 8; i++) {
             muscle_joints_[i].setTargetAngle(msg->muscle_joint[i].angle[0], msg->muscle_joint[i].angle[1]);
             
-            // 检查 CMD 模式 (CMD_PID_CONTROL = 2)
             if (msg->cmd == ihb_msgs::msg::IhbTarget::CMD_PID_CONTROL) {
                 muscle_joints_[i].setPidParameters(
                     msg->muscle_joint[i].kp[0], msg->muscle_joint[i].ki[0], msg->muscle_joint[i].kd[0],
                     msg->muscle_joint[i].kp[1], msg->muscle_joint[i].ki[1], msg->muscle_joint[i].kd[1]
+                    
+                );
+                // === 在这里添加打印语句 ===
+          // 每 1000 毫秒（1秒）打印一次，防止终端刷屏卡顿
+                auto & clock = *this->get_clock();
+                RCLCPP_INFO_THROTTLE(this->get_logger(), clock, 1000, 
+                    "收到肌肉关节 %d 的 PID 参数 -> 肌1[Kp:%.2f, Ki:%.2f, Kd:%.2f] | 肌2[Kp:%.2f, Ki:%.2f, Kd:%.2f]", 
+                    i, 
+                    msg->muscle_joint[i].kp[0], msg->muscle_joint[i].ki[0], msg->muscle_joint[i].kd[0],
+                    msg->muscle_joint[i].kp[1], msg->muscle_joint[i].ki[1], msg->muscle_joint[i].kd[1]
                 );
             }
+        }
+
+        // ==========================================================
+        // 3. [新增] 夹爪控制逻辑 (使用第 9 个 MuscleJoint，索引为 8)
+        // 映射规则：setPressure(左手开, 左手关, 右手开, 右手关)
+        // ==========================================================
+        if (first_gripper_cmd_ || 
+            msg->left_gripper_touched != last_left_touched_ || 
+            msg->right_gripper_touched != last_right_touched_) 
+        {
+            // 你可以根据你的底层气压系统修改充气阈值 (例如 255.0, 100.0 等)
+            float INFLATE = 255.0; // 充气时的指令值 
+            float DEFLATE = 0.0;   // 排气时的指令值
+
+            float p_left_open  = DEFLATE;
+            float p_left_close = DEFLATE;
+            float p_right_open  = DEFLATE;
+            float p_right_close = DEFLATE;
+
+            // --- 左手逻辑 ---
+            if (msg->left_gripper_touched) {
+                // 如果接触(闭合)：关通道充气，开通道排气
+                p_left_close = INFLATE;
+                p_left_open  = DEFLATE;
+            } else {
+                // 如果松开(展开)：开通道充气，关通道排气
+                p_left_open  = INFLATE;
+                p_left_close = DEFLATE;
+            }
+
+            // --- 右手逻辑 ---
+            if (msg->right_gripper_touched) {
+                p_right_close = INFLATE;
+                p_right_open  = DEFLATE;
+            } else {
+                p_right_open  = INFLATE;
+                p_right_close = DEFLATE;
+            }
+
+            // 发送给第 9 个通道 (索引 8)
+            muscle_joints_[8].setPressure(p_left_open, p_left_close, p_right_open, p_right_close);
+
+            // 更新状态缓存，防止重复发 CAN 指令导致总线卡顿
+            last_left_touched_ = msg->left_gripper_touched;
+            last_right_touched_ = msg->right_gripper_touched;
+            first_gripper_cmd_ = false;
+
+            RCLCPP_INFO(this->get_logger(), "夹爪动作更新 -> 左: %s | 右: %s", 
+                        msg->left_gripper_touched ? "闭合" : "松开",
+                        msg->right_gripper_touched ? "闭合" : "松开");
         }
     }
 
@@ -224,26 +253,23 @@ private:
     void pid_control_loop() {
         while (g_running_ && rclcpp::ok()) {
             std::vector<float> halls = hall_sensors_.getAllFilteredAngles();
-            // 必须等待双臂共16个传感器数据就绪
             if (halls.size() >= 16) {
                 std::lock_guard<std::mutex> lock(mtx_); 
                 
-                // --- 左臂 Left Arm (muscle_joints_ 0~3) ---
+                // --- 左臂 Left Arm (0~3) ---
                 for (int i = 0; i < 4; i++) {
-                    // i 对应 halls[i] 和 halls[7-i]
                     muscle_joints_[i].processAngle(-halls[7-i], halls[i]);
                     muscle_joints_[i].update(); 
                 }
 
-                // --- 右臂 Right Arm (muscle_joints_ 4~7) ---
+                // --- 右臂 Right Arm (4~7) ---
                 for (int i = 0; i < 4; i++) {
-                    int idx = 4 + i; // 肌肉关节实际索引 4,5,6,7
-                    // i 的取值是 0,1,2,3
-                    // idx=4 (i=0) -> halls[8], halls[15]
-                    // idx=5 (i=1) -> halls[9], halls[14]
+                    int idx = 4 + i; 
                     muscle_joints_[idx].processAngle(-halls[8+i], halls[15-i]);
                     muscle_joints_[idx].update();
                 }
+                
+                // 注意：第 9 个通道 (索引 8) 是直接压力控制，不需要进此 PID update()
             }
             std::this_thread::sleep_for(20ms);
         }
@@ -261,16 +287,16 @@ private:
                     uint32_t id = msg.getCanId();
                     std::memcpy(data, msg.getFrameData().data(), 8);
                     
-                    // 伺服电机 ID: 0x141 - 0x144
                     if (id == 0x141) ser1_.processCanMessage(data);
                     else if (id == 0x142) ser2_.processCanMessage(data);
                     else if (id == 0x143) ser3_.processCanMessage(data);
                     else if (id == 0x144) ser4_.processCanMessage(data);
                     
-                    // 肌肉关节阀岛反馈 (假设 ID 为 0x180 + JointID)
+                    // --- [修改] 肌肉关节阀岛反馈, 支持 9 个通道 ---
                     else if ((id >> 4) == 0x18) {
                         uint8_t idx = id & 0x0F;
-                        if(idx < 8) muscle_joints_[idx].processCanMessage(data);
+                        // 允许处理索引 0~8 的数据
+                        if(idx < 9) muscle_joints_[idx].processCanMessage(data); 
                     }
                 } catch (...) {}
             }
@@ -293,10 +319,14 @@ private:
     }
 
     void setup_hardware() {
-        for(int i=0; i<8; i++) {
+        // --- [修改] 初始化 9 个 MuscleJoint ---
+        for(int i=0; i<9; i++) { 
             muscle_joints_[i].setId(i);
             muscle_joints_[i].setCanDriver(shared_can_driver_);
-            muscle_joints_[i].setPidParameters(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+            // 只有前 8 个用作 PID 手臂关节才清零 PID 参数，第 9 个是夹爪直接开环给压力
+            if (i < 8) {
+                muscle_joints_[i].setPidParameters(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+            }
         }
         
         ser1_.setCanDriver(shared_can_driver_);
@@ -315,9 +345,16 @@ private:
     std::ofstream log_file_; 
     uint64_t start_time_ms_ = 0;
     
+    // --- [新增] 夹爪状态缓存，避免重复发送 ---
+    bool last_left_touched_ = false;
+    bool last_right_touched_ = false;
+    bool first_gripper_cmd_ = true;
+
     // 硬件对象
     ihb::HallSensors hall_sensors_;
-    ihb::MuscleJoint muscle_joints_[8]; // 0-7
+    
+    // --- [修改] 数组大小改为 9 ---
+    ihb::MuscleJoint muscle_joints_[9]; // 0-7: 手臂, 8: 夹爪
     ihb::ServoMotorJoint ser1_, ser2_, ser3_, ser4_;
 
     // ROS 通信
