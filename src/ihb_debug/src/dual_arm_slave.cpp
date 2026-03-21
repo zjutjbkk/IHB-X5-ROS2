@@ -57,10 +57,10 @@ public:
             publish_timer_ = this->create_wall_timer(50ms, std::bind(&DualArmSlave::publish_status_callback, this));
 
             // 电机初始限位 (0-360度)
-            ser1_.setPositonWithSpeedLimit(0.0, 360.0);
-            ser2_.setPositonWithSpeedLimit(0.0, 360.0);
-            ser3_.setPositonWithSpeedLimit(0.0, 360.0);
-            ser4_.setPositonWithSpeedLimit(0.0, 360.0);
+            // ser1_.setPositonWithSpeedLimit(0.0, 360.0);
+            // ser2_.setPositonWithSpeedLimit(0.0, 360.0);
+            // ser3_.setPositonWithSpeedLimit(0.0, 360.0);
+            // ser4_.setPositonWithSpeedLimit(0.0, 360.0);
 
         } catch (const std::exception& e) {
             RCLCPP_FATAL(this->get_logger(), "❌ 初始化失败: %s", e.what());
@@ -171,10 +171,10 @@ private:
         std::lock_guard<std::mutex> lock(mtx_);
         
         // 1. 伺服电机控制
-        ser1_.setPositonWithSpeedLimit(msg->servo_joint[0].angle*100, msg->servo_joint[0].speed_limit);
-        ser2_.setPositonWithSpeedLimit(msg->servo_joint[1].angle*100, msg->servo_joint[1].speed_limit);
-        ser3_.setPositonWithSpeedLimit(msg->servo_joint[2].angle*100, msg->servo_joint[2].speed_limit);
-        ser4_.setPositonWithSpeedLimit(msg->servo_joint[3].angle*100, msg->servo_joint[3].speed_limit);
+        // ser1_.setPositonWithSpeedLimit(msg->servo_joint[0].angle*100, msg->servo_joint[0].speed_limit);
+        // ser2_.setPositonWithSpeedLimit(msg->servo_joint[1].angle*100, msg->servo_joint[1].speed_limit);
+        // ser3_.setPositonWithSpeedLimit(msg->servo_joint[2].angle*100, msg->servo_joint[2].speed_limit);
+        // ser4_.setPositonWithSpeedLimit(msg->servo_joint[3].angle*100, msg->servo_joint[3].speed_limit);
 
         // 2. 肌肉关节控制 (前 8 个用于手臂 PID 控制)
         for (int i = 0; i < 8; i++) {
